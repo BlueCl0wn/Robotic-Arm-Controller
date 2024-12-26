@@ -164,7 +164,7 @@ def run() -> None:
         fitness = fitness_function(population, i)
 
         # Do algorithm stuff
-        # TODO: implement our algorithm (in directory solvers)
+        # TODO: implement our algorithm (in director solvers)
         theta, delta = NES(w_tries_numpy, fitness, params.learning_rate, w.get_parameters(), params.npop, params.sigma)
 
         # Increases exploration by introducing randomness after some number of step.
