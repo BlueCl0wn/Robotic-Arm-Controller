@@ -1,18 +1,55 @@
-import numpy as np
 import argparse
+
 import gymnasium as gym
 import gymnasium_robotics
-import tensorboardX
-# from git.repo import Repo
 import torch
 import tqdm
+import numpy as np
 
-
+from itertools import count
 from common import get_file_descriptor, splash_screen
 from episode_runner import run_simulation
-from models.nn_model import NeuralNetworkModel
-from solver.nes_demo import NES, sample_distribution
+from solvers.dqn import optimize_model, initiate_stuff, select_action
 
+
+# from solvers.nes_demo import NES, sample_distribution
+
+def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:
+    """
+    Flatten a dictionary of NumPy ndarrays into a single 1D NumPy ndarray.
+
+    This function takes a dictionary where the values are NumPy ndarrays,
+    flattens each array, and concatenates them into a single 1D ndarray.
+
+    Parameters:
+    -----------
+    d : dict
+        A dictionary where the values are NumPy ndarrays. The keys can be
+        of any hashable type. The arrays can have any shape or dimension.
+
+    Returns:
+    --------
+    numpy.ndarray
+        A 1D NumPy ndarray containing all elements from the input arrays,
+        concatenated in the order they appear in the dictionary.
+
+    Examples:
+    ---------
+    >> import numpy as np
+    >> d = {'a': np.array([[1, 2], [3, 4]]),
+    ...      'b': np.array([5, 6, 7]),
+    ...      'c': np.array([[8], [9], [10]])}
+    >> flatten_dict_of_ndarrays(d)
+    array([ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10])
+
+    Notes:
+    ------
+    - The order of elements in the output array depends on the order of
+      items in the input dictionary and the order of elements in each array.
+    - This function uses numpy.concatenate(), which is efficient for
+      combining multiple arrays.
+    """
+    return np.concatenate([arr.flatten() for arr in d.values()])
 
 def run() -> None:
     """
@@ -31,8 +68,8 @@ def run() -> None:
     params = argparse.Namespace()
 
     params.__dict__.update(args.__dict__)
-    # turn off wind, make it easier
-    params.env = ("FetchPickAndPlace-v3", dict(wind_power=0.1))
+    # Environment settings
+    params.env = ("FetchReach-v3" , dict(max_episode_steps=200,  reward_type="dense")) #
     params.version = "v1"
     #params.commit = repo.head.commit.hexsha
 
@@ -62,11 +99,11 @@ def run() -> None:
         # params.[parameter] =
 
         # Set size of neural network
-        params.input_size = env.observation_space.shape[0]
+        params.input_size = sum([i.shape[0] for i in env.observation_space.values()]) # This calculates the size of the
+        #                                                                            observation space as a simple int.
         params.output_size = env.action_space.shape[0] if isinstance(env.action_space,
                                                                      gym.spaces.Box) else env.action_space.n
-        params.hidden_layers = [16, 4]
-        params.model_penalty = 0.01
+        params.hidden_layers = [32, 32]
 
         # Training parameters
         params.episode_start = 0
@@ -74,9 +111,16 @@ def run() -> None:
         params.repetitions = 100
         params.max_steps = 300
         params.npop = 30
+
         params.episodes = 50_000
 
-        # Exploration stuff
+        # if torch.cuda.is_available() or torch.backends.mps.is_available():
+        #
+        #     params.episodes = 600
+        # else:
+        #     params.episodes = 50
+
+        # Exploration stuff TODO: not necessary?
         params.step_randomness_to_w_small = 100
         params.step_randomness_to_w_big = 2000
         params.sigma_random_small = 0.001
@@ -84,107 +128,99 @@ def run() -> None:
         params.learning_rate = 0.15
         params.sigma = 1.5
 
+        # if GPU is to be used
+        params.device = torch.device(
+            "cuda" if torch.cuda.is_available() else
+            "mps" if torch.backends.mps.is_available() else
+            "cpu"
+        )
 
+        # ------ DQN Params -------
+        params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer # TODO rename considering params.batch_size?
+        params.GAMMA = 0.99  # discount factor as mentioned in the previous section
+        params.EPS_START = 0.9  # starting value of epsilon
+        params.EPS_END = 0.05  # final value of epsilon
+        params.EPS_DECAY = 1000  # controls the rate of exponential decay of epsilon, higher means a slower decay
+        params.TAU = 0.005  # update rate of the target network
+        params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
     set_hyperparams()
 
     # Logging hyperparameters. Should this be after the if for resuming? Not sure rn. TODO?
     logger = splash_screen(params)
     logger.flush()
 
-    # Our main neural network on which all work is done.
-    # Currently, this model is reset to after each repetitions and new generation are computed by sampling around it.
-    # Not sure if this is the best implementation with our training algorithm (don't even know which one that is).
-    w = NeuralNetworkModel(params.input_size, params.output_size, params.hidden_layers) # TODO: implement model
-    print(w.get_parameters().shape)
-
-    def get_population():
-        """
-        Function for computing the first population. Not implemented.
-        :return:
-        """
-        # [w.new_from_parameters(w.get_parameters()) for _ in range(params.npop)]
-        raise NotImplementedError
-
-    # Set first population
-    population = get_population()
+    # initiate stuff for DQN TODO: maybe find a better name than stuff lol
+    stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
 
     # Stuff in case resuming is enabled. Resets w to saved model
     if params.resume:
         w = torch.load(params.resume)
-        params.eposode_start = int(params.resume.split("_")[-1].split(".")[0])
-        print(f"Resuming training from episode {params.eposode_start} of {params.resume}")
+        params.episode_start = int(params.resume.split("_")[-1].split(".")[0])
+        print(f"Resuming training from episode {params.episode_start} of {params.resume}")
 
+    def run_dqn_once(env, state, policy_net, target_net, optimizer, memory):
+            for t in count(): # TODO maybe replace 'count()' (counted infinite loop) with 'max_steps'.
+                          #      Seems more useful to me as this way there is no step_limit to the simulation
+                action = select_action(env, state, *stuff, t, params)
+                print("action: ", action)
+                observation, reward, terminated, truncated, _ = env.step(action.tolist())
+                observation = flatten_dict(observation) # flatten observation from dict[np.ndarray] to np.ndarray
+                reward = torch.tensor([reward], device=params.device)
+                done = terminated or truncated
 
-    def fitness_function(models : list, i: int) -> list[int]:
-        """
-        Compute reward functon of parsed models. Implementation not done (TODO).
+                if terminated:
+                    next_state = None
+                else:
+                    next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
 
-        :param models: list of models for which to compute reward
-        :param i: training step. necessary for logging purposes.
-        :return: list of rewards
-        """
+                # Store the transition in memory
+                memory.push(state, action, next_state, reward)
 
-        fitnesses, lengths = run_simulation(models,  # type: ignore
-                                          params.env,
-                                          params.max_steps,
-                                          repetitions=params.repetitions,
-                                          batch_size=params.batch_size,
-                                          progress_bar=False,
-                                          make_env=make_env,
-                                          )
+                # Move to the next state
+                state = next_state
 
-        model_penalties = np.array([model.get_model_penalty() * params.model_penalty for model in models])
-        fitnesses -= model_penalties
+                # Perform one step of the optimization (on the policy network)
+                optimize_model(*stuff, params)
 
-        # logging stuff
-        if i % 10 == 0:
-            logger.add_histogram("fitness_hist", fitnesses, i)
-            logger.add_histogram("model_penalties", model_penalties, i)
+                # Soft update of the target network's weights
+                # θ′ ← τ θ + (1 −τ )θ′
+                target_net_state_dict = target_net.state_dict()
+                policy_net_state_dict = policy_net.state_dict()
+                for key in policy_net_state_dict:
+                    target_net_state_dict[key] = policy_net_state_dict[key] * params.TAU + target_net_state_dict[key] * (
+                                1 - params.TAU)
+                target_net.load_state_dict(target_net_state_dict)
 
-        logger.add_scalar("fitness_mean", fitnesses.mean(), i)
-        logger.add_scalar("steps_mean", lengths.mean(), i)
-        #  return fitness.mean(axis=0)
-        raise NotImplementedError
+                if done:
+                    break
 
 
     # TQDM loading bar stuff
     episodes = tqdm.trange(
-        params.eposode_start,
-        params.episodes + params.eposode_start,
+        params.episode_start,
+        params.episodes + params.episode_start,
         desc="Fitness",
     )
 
     # Training loop
     for i in episodes:
 
-        # This computes new population to check. I am not sure anymore where "sample_distribution" comes from and what it does. TODO?
-        w_tries_numpy = sample_distribution(w, population, params.sigma, params.npop)
+        # Initialize the environment and get its state
+        state, info = env.reset()
+        state = flatten_dict(state)
+        state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
 
-        # Calculate fitnesses of w_tries_numpy
-        fitness = fitness_function(population, i)
+        run_dqn_once(env, state, policy_net, target_net, optimizer, memory)
 
-        # Do algorithm stuff
-        # TODO: implement our algorithm (in director solvers)
-        theta, delta = NES(w_tries_numpy, fitness, params.learning_rate, w.get_parameters(), params.npop, params.sigma)
 
-        # Increases exploration by introducing randomness after some number of step.
-        # To turn off just set the appropriate params to a really high number. I am to lazy to add an if rn.
-        # Maybe it would be better to change the steps to some other condition (e.g. convergence) . TODO?
-        if i % params.step_randomness_to_w_big == 0 and i > 1:
-            theta += np.random.normal(loc=0, scale=params.sigma_random_big, size=theta.shape)
-        elif i % params.step_randomness_to_w_small == 0 and i > 1:
-            theta += np.random.normal(loc=0, scale=params.sigma_random_small, size=theta.shape)
 
-        # Set reference model with new values for next episode.
-        w.set_parameters(theta)
-
-        # This block check the performance of the refernce model (w) every 10 episodes and saves that value.
+        # This block check the performance of the reference model (w) every 10 episodes and saves that value.
         # Quite important to know as we are doing the whole training to get a good reference model.
         if i % 10 == 0:
-            reference_fitness, _ = run_simulation([w],  # type: ignore
+            reference_fitness, _ = run_simulation([policy_net],  # type: ignore # TODO: Is it more useful to test  policy_net or target_net? Also effects other logging commands
                                                   params.env,
                                                   params.max_steps,
-                                                  repetitions=200,
+                                                  repetitions=100,
                                                   batch_size=10,
                                                   progress_bar=False,
                                                   make_env=make_env,
@@ -194,26 +230,15 @@ def run() -> None:
 
             # log stuff
             logger.add_scalar("reference_fitness", reference_fitness.mean(), i)
-            logger.add_histogram("w_delta", delta, i)
-            parameters = w.get_parameters()
-            logger.add_histogram("w_params", parameters, i)
+            # logger.add_histogram("w_delta", delta, i) TODO add interesting information to logger
+            parameters = policy_net.get_parameters()
+            logger.add_histogram("policy_net_params", parameters, i)
 
         # This block saves the model every 100 episodes.
         if i % 100 == 0:
             # save w to disk
             descrp = get_file_descriptor(params, i)
-            torch.save(w, descrp)
-
-        # This is block also for exploration. It decreases the sigma and learning_rate of the sampling at the beginning of this loop in every episode.
-        # When they are too low, they are reset to a higher value. This results in kind of a chain saw behavior when plotted to episodes.
-        # We should discuss if this is a good idea for us. Of course also depends on the training algorithm. TODO?
-        params.sigma *= 0.9995
-        if params.sigma < 0.5:
-            params.sigma = 1.5
-
-        params.learning_rate *= 0.999
-        if params.learning_rate < 0.05:
-            params.learning_rate = 0.25
+            torch.save(policy_net, descrp)
 
         # log
         logger.add_scalar("sigma", params.sigma, i)

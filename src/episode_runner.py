@@ -6,6 +6,11 @@ import numpy as np
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from models import Model
 
+"""
+These functions were added for the NES algorithm. Therefore they are mostly useless fpr DQN.
+Maybe we can delete them later one.
+"""
+
 
 def run_once(model: Model, env: gym.Env, max_steps: int, show_observation: bool, show_action: bool) -> tuple:
     """
@@ -75,7 +80,7 @@ def run_once_thin(model: Model, env: gym.Env, max_steps: int) -> tuple:
         reward += max(0, 1.0 - abs(v_x)) * 0.01
         reward += max(0, 1.0 - abs(v_y + 0.5)) * 0.1
 
-        # penaly for hovering
+        # penalty for hovering
         if abs(v_y) < 0.1:
             reward -= 0.0
 
@@ -84,7 +89,7 @@ def run_once_thin(model: Model, env: gym.Env, max_steps: int) -> tuple:
                 (angle < 0 and x < 0 and decision == 2):
             reward += 0.05
 
-        # Heavlily penalize going out of 2.0 rage off the center
+        # Heavily penalize going out of 2.0 rage off the center
         if abs(x) > 1.25:
             reward -= 1
 
@@ -183,6 +188,7 @@ def run_simulation(models: list[Model] | Model,
     ]
 
     results = tqdm(executor.map(run_batch, tasks), total=batches, disable=not progress_bar)
+    print(results)
     fitnesses, lengths = zip(*itertools.chain.from_iterable(results))
     return np.array(fitnesses).reshape(repetitions, len(models)), np.array(lengths).reshape(repetitions, len(models))
 
@@ -194,15 +200,15 @@ if __name__ == "__main__":
     models = [RandomModel() for _ in range(500)]  # type: list[Model]
 
     start_time = time.time()
-    fitness, lenghts = run_simulation(models, ("LunarLander-v3", dict(continuous=True)), 150, repetitions=100,
+    fitness, lengths = run_simulation(models, ("LunarLander-v3", dict(continuous=True)), 150, repetitions=100,
                                       batch_size=50)
     end_time = time.time()
 
     print(f"Execution time: {end_time - start_time} seconds")
 
-    print(fitness, lenghts)
-    print(np.mean(fitness), np.mean(lenghts))
+    print(fitness, lengths)
+    print(np.mean(fitness), np.mean(lengths))
 
     # model = RandomModel()
-    # fitness, lenght = run_simulation([model], "LunarLander-v3", 1000, 1, render=True, show_observation=True, show_action=True)
-    # print(fitness, lenght)
+    # fitness, length = run_simulation([model], "LunarLander-v3", 1000, 1, render=True, show_observation=True, show_action=True)
+    # print(fitness, length)

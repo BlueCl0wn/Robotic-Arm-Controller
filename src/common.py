@@ -9,8 +9,8 @@ def splash_screen(params: Namespace):
     print(r"""
     Stochastic GYM Trainer ; Commit before running                                                           
     """)
-    run_name = config.RUN_NAME + "_" + params.commit[:8] + "_" + params.version
-    print(f" Version: {params.commit} ".center(88, "="))
+    run_name = config.RUN_NAME + params.version # "_" + params.commit[:8] + "_" + params.version
+    print(f" Version: {params.version} ".center(88, "="))
     print(f" Run Name: {run_name} ".center(88, "="))
 
     train_summary_writer = SummaryWriter(log_dir=os.path.join(config.LOG_DIR_ROOT, run_name))
@@ -29,5 +29,12 @@ def splash_screen(params: Namespace):
     return train_summary_writer
 
 
-def get_file_descriptor(params: Namespace, episode: int):
+def get_file_descriptor(params: Namespace, episode: int) -> str:
+    """
+    Creates filename for a training run.
+
+    :param params: Namespace of training run
+    :param episode: episode number at moment of saving
+    :return: str
+    """
     return f"{config.MODELS_DIR}/{params.version}_{config.RUN_NAME}_{params.commit[:8]}_{episode}.pth"

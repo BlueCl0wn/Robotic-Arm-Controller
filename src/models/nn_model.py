@@ -52,7 +52,8 @@ class NeuralNetworkModel(Model, nn.Module):
 
     def make_decision(self, observation: np.ndarray) -> np.ndarray:
         """
-        Main decision-making function of the neural network.
+        Main decision-making function of the neural network. Basically the same as self.forward but uses np.argmax on return of self.forward().
+
         :param observation: np.ndarray as input vector representing the observation state.
         :return: np.ndarray as output vector representing the decision.
         """
