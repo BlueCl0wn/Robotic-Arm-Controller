@@ -37,4 +37,4 @@ def get_file_descriptor(params: Namespace, episode: int) -> str:
     :param episode: episode number at moment of saving
     :return: str
     """
-    return f"{config.MODELS_DIR}/{params.version}_{config.RUN_NAME}_{params.commit[:8]}_{episode}.pth"
+    return f"{config.MODELS_DIR}/{params.version}_{config.RUN_NAME}_{episode}.pth" #  '_{params.commit[:8]}'

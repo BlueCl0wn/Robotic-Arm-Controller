@@ -8,7 +8,6 @@ import numpy as np
 
 from itertools import count
 from common import get_file_descriptor, splash_screen
-from episode_runner import run_simulation
 from solvers.dqn import optimize_model, initiate_stuff, select_action
 
 
@@ -107,7 +106,7 @@ def run() -> None:
 
         # Training parameters
         params.episode_start = 0
-        params.batch_size = 10
+        params.batch_size = 10 # This batch size was used for multiprocessing. TODO implement multiprocessing (is that even possible for this algorithm?)
         params.repetitions = 100
         params.max_steps = 300
         params.npop = 30
@@ -120,15 +119,8 @@ def run() -> None:
         # else:
         #     params.episodes = 50
 
-        # Exploration stuff TODO: not necessary?
-        params.step_randomness_to_w_small = 100
-        params.step_randomness_to_w_big = 2000
-        params.sigma_random_small = 0.001
-        params.sigma_random_big = 0.02
-        params.learning_rate = 0.15
-        params.sigma = 1.5
 
-        # if GPU is to be used
+        # if GPU is to be used TODO This might be nice to implement. Because rn this is slow as fuck.
         params.device = torch.device(
             "cuda" if torch.cuda.is_available() else
             "mps" if torch.backends.mps.is_available() else
@@ -145,54 +137,20 @@ def run() -> None:
         params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
     set_hyperparams()
 
-    # Logging hyperparameters. Should this be after the if for resuming? Not sure rn. TODO?
-    logger = splash_screen(params)
-    logger.flush()
-
-    # initiate stuff for DQN TODO: maybe find a better name than stuff lol
-    stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
-
-    # Stuff in case resuming is enabled. Resets w to saved model
+    # Stuff in case resuming is enabled. Resets w to saved model TODO: This doesn't do any good rn.
+    #                                                               Needs to be updated to work with DQN
     if params.resume:
         w = torch.load(params.resume)
         params.episode_start = int(params.resume.split("_")[-1].split(".")[0])
         print(f"Resuming training from episode {params.episode_start} of {params.resume}")
 
-    def run_dqn_once(env, state, policy_net, target_net, optimizer, memory):
-            for t in count(): # TODO maybe replace 'count()' (counted infinite loop) with 'max_steps'.
-                          #      Seems more useful to me as this way there is no step_limit to the simulation
-                action = select_action(env, state, *stuff, t, params)
-                print("action: ", action)
-                observation, reward, terminated, truncated, _ = env.step(action.tolist())
-                observation = flatten_dict(observation) # flatten observation from dict[np.ndarray] to np.ndarray
-                reward = torch.tensor([reward], device=params.device)
-                done = terminated or truncated
+    # Logging hyperparameters.
+    logger = splash_screen(params)
+    logger.flush()
 
-                if terminated:
-                    next_state = None
-                else:
-                    next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
 
-                # Store the transition in memory
-                memory.push(state, action, next_state, reward)
-
-                # Move to the next state
-                state = next_state
-
-                # Perform one step of the optimization (on the policy network)
-                optimize_model(*stuff, params)
-
-                # Soft update of the target network's weights
-                # θ′ ← τ θ + (1 −τ )θ′
-                target_net_state_dict = target_net.state_dict()
-                policy_net_state_dict = policy_net.state_dict()
-                for key in policy_net_state_dict:
-                    target_net_state_dict[key] = policy_net_state_dict[key] * params.TAU + target_net_state_dict[key] * (
-                                1 - params.TAU)
-                target_net.load_state_dict(target_net_state_dict)
-
-                if done:
-                    break
+    # initiate stuff for DQN TODO: maybe find a better name than stuff lol
+    stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
 
 
     # TQDM loading bar stuff
@@ -210,41 +168,64 @@ def run() -> None:
         state = flatten_dict(state)
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
 
-        run_dqn_once(env, state, policy_net, target_net, optimizer, memory)
+        for t in count():  # TODO maybe replace 'count()' (counted infinite loop) with 'max_steps'.
+            #      Seems more useful to me as this way there is no step_limit to the simulation
+            action = select_action(env, state, *stuff, t, params)
+            # print("action: ", action)
+            observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
+            observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
+            reward = torch.tensor([reward_env], device=params.device)
+            done = terminated or truncated
+
+            # This block check the performance of the reference model (w) every 10 episodes and saves that value.
+            # Quite important to know as we are doing the whole training to get a good reference model.
+            if i % 10 == 0:
+                # Change current reference_fitness shown in loading bar.
+                episodes.set_description(f"Fitness: {reward_env:.2f}")
+
+                # log fitness
+                logger.add_scalar("reference_fitness", reward_env, i)
+                parameters = policy_net.get_parameters()
+                logger.add_histogram("policy_net_params", parameters, i)
+                # TODO addm more interesting information to logger
 
 
+            if terminated:
+                next_state = None
+            else:
+                next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
 
-        # This block check the performance of the reference model (w) every 10 episodes and saves that value.
-        # Quite important to know as we are doing the whole training to get a good reference model.
-        if i % 10 == 0:
-            reference_fitness, _ = run_simulation([policy_net],  # type: ignore # TODO: Is it more useful to test  policy_net or target_net? Also effects other logging commands
-                                                  params.env,
-                                                  params.max_steps,
-                                                  repetitions=100,
-                                                  batch_size=10,
-                                                  progress_bar=False,
-                                                  make_env=make_env,
-                                                  ) # Compute reference_fitness
+            # Store the transition in memory
+            memory.push(state, action, next_state, reward)
 
-            episodes.set_description(f"Fitness: {reference_fitness.mean():.2f}") # Add current reference_fitness to loading bar.
+            # Move to the next state
+            state = next_state
 
-            # log stuff
-            logger.add_scalar("reference_fitness", reference_fitness.mean(), i)
-            # logger.add_histogram("w_delta", delta, i) TODO add interesting information to logger
-            parameters = policy_net.get_parameters()
-            logger.add_histogram("policy_net_params", parameters, i)
+            # Perform one step of the optimization (on the policy network)
+            optimize_model(*stuff, params)
 
-        # This block saves the model every 100 episodes.
-        if i % 100 == 0:
-            # save w to disk
-            descrp = get_file_descriptor(params, i)
-            torch.save(policy_net, descrp)
+            # Soft update of the target network's weights
+            # θ′ ← τ θ + (1 −τ )θ′
+            target_net_state_dict = target_net.state_dict()
+            policy_net_state_dict = policy_net.state_dict()
+            for key in policy_net_state_dict:
+                target_net_state_dict[key] = policy_net_state_dict[key] * params.TAU + target_net_state_dict[key] * (
+                        1 - params.TAU)
+            target_net.load_state_dict(target_net_state_dict)
 
-        # log
-        logger.add_scalar("sigma", params.sigma, i)
+            # This block saves the model every 100 episodes.
+            if i % 100 == 0:
+                # save w to disk
+                descrp = get_file_descriptor(params, i)
+                torch.save(policy_net, descrp)
 
+            # log
+            logger.add_scalar("sigma", params.sigma, i)
+
+            if done:
+                break
+    env.close()
     pass
-
 
 if __name__ == '__main__':
     run()

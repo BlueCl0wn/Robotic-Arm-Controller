@@ -1,5 +1,5 @@
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as f
 
 class DQN(nn.Module):
     """
@@ -17,6 +17,6 @@ class DQN(nn.Module):
     # Called with either one element to determine next action, or a batch
     # during optimization. Returns tensor([[left0exp,right0exp]...]).
     def forward(self, x):
-        x = F.relu(self.layer1(x))
-        x = F.relu(self.layer2(x))
+        x = f.relu(self.layer1(x))
+        x = f.relu(self.layer2(x))
         return self.layer3(x)

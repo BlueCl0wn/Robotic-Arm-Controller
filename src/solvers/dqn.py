@@ -18,9 +18,7 @@ source: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 def initiate_stuff(params: argparse.Namespace):
     """
-
-    :param n_observations: Size of observation space.
-    :param n_actions: Size of action space.
+    TODO add docstring
     :param params:
     :return:
     """
