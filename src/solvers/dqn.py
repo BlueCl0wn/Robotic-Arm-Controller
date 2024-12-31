@@ -22,9 +22,9 @@ def initiate_stuff(params: argparse.Namespace):
     :param params:
     :return:
     """
-    #policy_net = DQN(n_observations, n_actions).to(params.device) # TODO replace with nn_model
+    #policy_net = DQN(n_observations, n_actions).to(params.device)
     policy_net = NeuralNetworkModel(params.input_size, params.output_size, params.hidden_layers).to(params.device)
-    #target_net = DQN(n_observations, n_actions).to(params.device) # TODO replace with nn_model
+    #target_net = DQN(n_observations, n_actions).to(params.device)
     target_net = NeuralNetworkModel(params.input_size, params.output_size, params.hidden_layers).to(params.device)
     target_net.load_state_dict(policy_net.state_dict())
 
@@ -97,12 +97,19 @@ def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.N
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
     action_batch = torch.cat(batch.action)
+    action_batch = torch.stack(batch.action).view(params.BATCH_SIZE, -1)
+
     reward_batch = torch.cat(batch.reward)
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
-    state_action_values = policy_net(state_batch)#.gather(1, action_batch) TODO This is from the example project. Here it makes a mess. Is okay to just remove?
+    print("shape(state_batch) =", state_batch.shape)
+    print("shape(action_batch) = ", action_batch.shape)
+    state_action_values = policy_net(state_batch).gather(1, action_batch.long()) # This is from the example project. Here it makes a mess. Is okay to just remove?
+
+    print("shape(policy_net(state_batch)) = ", policy_net(state_batch).shape)
+    print("shape(state_action_values) = ", state_action_values.shape)
 
     # Compute V(s_{t+1}) for all next states.
     # Expected values of actions for non_final_next_states are computed based
@@ -117,7 +124,7 @@ def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.N
 
     # Compute Huber loss
     criterion = nn.SmoothL1Loss()
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
+    loss = criterion(state_action_values, expected_state_action_values) #Perplexiy said this is not necessary: '.unsqueeze(1))'
 
     # Optimize the model
     optimizer.zero_grad()

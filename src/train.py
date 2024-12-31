@@ -102,7 +102,9 @@ def run() -> None:
         #                                                                            observation space as a simple int.
         params.output_size = env.action_space.shape[0] if isinstance(env.action_space,
                                                                      gym.spaces.Box) else env.action_space.n
-        params.hidden_layers = [32, 32]
+        print("input_size = ",params.input_size)
+        print("output_size = ",params.output_size)
+        params.hidden_layers = [64, 64]
 
         # Training parameters
         params.episode_start = 0
@@ -120,12 +122,13 @@ def run() -> None:
         #     params.episodes = 50
 
 
-        # if GPU is to be used TODO This might be nice to implement. Because rn this is slow as fuck.
+        # if GPU is to be used TODO This might be nice to implement because rn this is slow as fuck.
         params.device = torch.device(
             "cuda" if torch.cuda.is_available() else
             "mps" if torch.backends.mps.is_available() else
             "cpu"
         )
+        print("device = ", params.device)
 
         # ------ DQN Params -------
         params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer # TODO rename considering params.batch_size?
@@ -187,7 +190,7 @@ def run() -> None:
                 logger.add_scalar("reference_fitness", reward_env, i)
                 parameters = policy_net.get_parameters()
                 logger.add_histogram("policy_net_params", parameters, i)
-                # TODO addm more interesting information to logger
+                # TODO add more interesting information to logger
 
 
             if terminated:
@@ -220,7 +223,7 @@ def run() -> None:
                 torch.save(policy_net, descrp)
 
             # log
-            logger.add_scalar("sigma", params.sigma, i)
+            # logger.add_scalar("sigma", params.sigma, i)
 
             if done:
                 break
