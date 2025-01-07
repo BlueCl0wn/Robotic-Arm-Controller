@@ -68,7 +68,8 @@ def run() -> None:
 
     params.__dict__.update(args.__dict__)
     # Environment settings
-    params.env = ("FetchReachDense-v3" , dict(max_episode_steps=200,  reward_type="dense")) #
+    params.max_teps = 200
+    params.env = ("FetchReachDense-v3" , dict(max_episode_steps=params.max_teps,  reward_type="dense")) #
     params.version = "v1"
     #params.commit = repo.head.commit.hexsha
 
@@ -108,9 +109,7 @@ def run() -> None:
 
         # Training parameters
         params.episode_start = 0
-        params.batch_size = 10 # This batch size was used for multiprocessing. TODO implement multiprocessing (is that even possible for this algorithm?)
         params.repetitions = 100
-        params.max_steps = 300
         params.npop = 30
 
         params.episodes = 50_000
@@ -131,7 +130,7 @@ def run() -> None:
         print("device = ", params.device)
 
         # ------ DQN Params -------
-        params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer # TODO rename considering params.batch_size?
+        params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer
         params.GAMMA = 0.99  # discount factor as mentioned in the previous section
         params.EPS_START = 0.9  # starting value of epsilon
         params.EPS_END = 0.05  # final value of epsilon
@@ -140,12 +139,13 @@ def run() -> None:
         params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
     set_hyperparams()
 
-    # Stuff in case resuming is enabled. Resets w to saved model TODO: This doesn't do any good rn.
-    #                                                               Needs to be updated to work with DQN
+    # Stuff in case resuming is enabled. Resets w to saved model TODO: need to check this actually works
     if params.resume:
-        w = torch.load(params.resume)
-        params.episode_start = int(params.resume.split("_")[-1].split(".")[0])
-        print(f"Resuming training from episode {params.episode_start} of {params.resume}")
+        resume = params.resume
+        stuff, i, params = torch.load(params.resume)
+        params.resume = resume
+        # params.episode_start = int(params.resume.split("_")[-1].split(".")[0])
+        print(f"Resuming training from episode {params.i} of {params.resume}")
 
     # Logging hyperparameters.
     logger = splash_screen(params)
@@ -171,8 +171,8 @@ def run() -> None:
         state = flatten_dict(state)
         #print("state: ", state, "\n", len(state))
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
-
-        for t in count():  # TODO maybe replace 'count()' (counted infinite loop) with 'max_steps'.
+        episode_reward_total = 0
+        for t in range(params.max_teps+10):
             #      Seems more useful to me as this way there is no step_limit to the simulation
             action = select_action(env, state, *stuff, t, params)
             # print("action: ", action)
@@ -180,18 +180,7 @@ def run() -> None:
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
             reward = torch.tensor([reward_env], device=params.device)
             done = terminated or truncated
-
-            # This block check the performance of the reference model (w) every 10 episodes and saves that value.
-            # Quite important to know as we are doing the whole training to get a good reference model.
-            if i % 10 == 0:
-                # Change current reference_fitness shown in loading bar.
-                episodes.set_description(f"Fitness: {reward_env:.2f}")
-
-                # log fitness
-                logger.add_scalar("reference_fitness", reward_env, i)
-                parameters = policy_net.get_parameters()
-                logger.add_histogram("policy_net_params", parameters, i)
-                # TODO add more interesting information to logger
+            episode_reward_total += reward_env
 
 
             if truncated:
@@ -217,17 +206,28 @@ def run() -> None:
                         1 - params.TAU)
             target_net.load_state_dict(target_net_state_dict)
 
-            # This block saves the model every 100 episodes.
-            if i % 100 == 0:
-                # save w to disk
-                descrp = get_file_descriptor(params, i)
-                torch.save(policy_net, descrp)
-
             # log
             # logger.add_scalar("sigma", params.sigma, i)
 
             if done:
                 break
+
+        # This block saves the model every 100 episodes.
+        if i % 100 == 0:
+            # save w to disk
+            descrp = get_file_descriptor(params, i)
+            torch.save((stuff, i, params), descrp)
+
+        # This block check the performance of the model every 10 episodes and saves that value.
+        if i % 10 == 0:
+            # Change current reference_fitness shown in loading bar.
+            episodes.set_description(f"Fitness: {episode_reward_total:.2f}")
+
+            # log fitness
+            logger.add_scalar("fitness", episode_reward_total, i)
+            logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)
+            logger.add_histogram("target_net_params", target_net.get_parameters(), i)
+            # TODO add other interesting information to logger
     env.close()
     pass
 
