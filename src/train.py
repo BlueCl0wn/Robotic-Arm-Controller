@@ -96,8 +96,6 @@ def run() -> None:
 
         :return None:
         """
-        # params.[parameter] =
-
         # Set size of neural network
         params.input_size = sum([i.shape[0] for i in env.observation_space.values()]) # This calculates the size of the
         #                                                                            observation space as a simple int.
@@ -111,15 +109,7 @@ def run() -> None:
         params.episode_start = 0
         params.repetitions = 100
         params.npop = 30
-
         params.episodes = 50_000
-
-        # if torch.cuda.is_available() or torch.backends.mps.is_available():
-        #
-        #     params.episodes = 600
-        # else:
-        #     params.episodes = 50
-
 
         # if GPU is to be used TODO This might be nice to implement because rn this is slow as fuck.
         params.device = torch.device(
@@ -139,22 +129,19 @@ def run() -> None:
         params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
     set_hyperparams()
 
-    # Stuff in case resuming is enabled. Resets w to saved model TODO: need to check this actually works
+    # Stuff in case resuming is enabled. TODO: need to check this actually works
     if params.resume:
         resume = params.resume
         stuff, i, params = torch.load(params.resume)
         params.resume = resume
-        # params.episode_start = int(params.resume.split("_")[-1].split(".")[0])
         print(f"Resuming training from episode {params.i} of {params.resume}")
 
     # Logging hyperparameters.
     logger = splash_screen(params)
     logger.flush()
 
-
     # initiate stuff for DQN TODO: maybe find a better name than stuff lol
     stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
-
 
     # TQDM loading bar stuff
     episodes = tqdm.trange(
@@ -218,7 +205,7 @@ def run() -> None:
             descrp = get_file_descriptor(params, i)
             torch.save((stuff, i, params), descrp)
 
-        # This block check the performance of the model every 10 episodes and saves that value.
+        # This block checks the performance of the model every 10 episodes and saves that value.
         if i % 10 == 0:
             # Change current reference_fitness shown in loading bar.
             episodes.set_description(f"Fitness: {episode_reward_total:.2f}")
