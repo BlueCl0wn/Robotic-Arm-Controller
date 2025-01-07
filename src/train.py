@@ -129,19 +129,20 @@ def run() -> None:
         params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
     set_hyperparams()
 
-    # Stuff in case resuming is enabled. TODO: need to check this actually works
-    if params.resume:
-        resume = params.resume
-        stuff, i, params = torch.load(params.resume)
-        params.resume = resume
-        print(f"Resuming training from episode {params.i} of {params.resume}")
-
     # Logging hyperparameters.
     logger = splash_screen(params)
     logger.flush()
 
     # initiate stuff for DQN TODO: maybe find a better name than stuff lol
     stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
+
+    # Stuff in case resuming is enabled.
+    if params.resume:
+        resume = params.resume
+        stuff, i, params = torch.load(params.resume)
+        params.resume = resume
+        params.episode_start = i
+        print(f"Resuming training from episode {i} of {params.resume}")
 
     # TQDM loading bar stuff
     episodes = tqdm.trange(
@@ -209,7 +210,6 @@ def run() -> None:
         if i % 10 == 0:
             # Change current reference_fitness shown in loading bar.
             episodes.set_description(f"Fitness: {episode_reward_total:.2f}")
-
             # log fitness
             logger.add_scalar("fitness", episode_reward_total, i)
             logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)

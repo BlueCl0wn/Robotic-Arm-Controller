@@ -51,7 +51,7 @@ def get_action(observation, i):
         return action.tolist()
 
 # set duration of runtime loop
-N = 500
+N = 10000
 
 # stuff for saving observations and actions in csv
 # Handy in order to generate a decision tree.

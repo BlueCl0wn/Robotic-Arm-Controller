@@ -96,7 +96,7 @@ def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.N
     non_final_next_states = torch.cat([s for s in batch.next_state
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
-    action_batch = torch.cat(batch.action)
+    # action_batch = torch.cat(batch.action)
     action_batch = torch.stack(batch.action).view(params.BATCH_SIZE, -1)
 
     reward_batch = torch.cat(batch.reward)
