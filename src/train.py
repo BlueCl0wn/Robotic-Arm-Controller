@@ -68,7 +68,7 @@ def run() -> None:
 
     params.__dict__.update(args.__dict__)
     # Environment settings
-    params.env = ("FetchReach-v3" , dict(max_episode_steps=200,  reward_type="dense")) #
+    params.env = ("FetchReachDense-v3" , dict(max_episode_steps=200,  reward_type="dense")) #
     params.version = "v1"
     #params.commit = repo.head.commit.hexsha
 
