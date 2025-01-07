@@ -169,6 +169,7 @@ def run() -> None:
         # Initialize the environment and get its state
         state, info = env.reset()
         state = flatten_dict(state)
+        #print("state: ", state, "\n", len(state))
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
 
         for t in count():  # TODO maybe replace 'count()' (counted infinite loop) with 'max_steps'.
@@ -193,7 +194,7 @@ def run() -> None:
                 # TODO add more interesting information to logger
 
 
-            if terminated:
+            if truncated:
                 next_state = None
             else:
                 next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
