@@ -1,8 +1,8 @@
 # Robotic-Arm-Controller
 
 ## authors
-- **Marie Korn** [GitHub](https://github.com/markorn1612)  
-  - ??
+- **Marie-Luise Korn** [GitHub](https://github.com/markorn1612)  
+  - Brandenburg University of Applied Sciences
 - **Darek Petersen** [GitHub](https://github.com/BlueCl0wn) 
   - University of Hamburg  
 - **Leo**  [Github](??)
