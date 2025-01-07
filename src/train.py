@@ -103,8 +103,8 @@ def run() -> None:
         #                                                                            observation space as a simple int.
         params.output_size = env.action_space.shape[0] if isinstance(env.action_space,
                                                                      gym.spaces.Box) else env.action_space.n
-        print("input_size = ",params.input_size)
-        print("output_size = ",params.output_size)
+        #print("input_size = ",params.input_size)
+        #print("output_size = ",params.output_size)
         params.hidden_layers = [64, 64]
 
         # Training parameters

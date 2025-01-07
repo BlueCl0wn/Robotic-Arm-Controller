@@ -3,32 +3,34 @@ import gymnasium_robotics
 import numpy as np
 import argparse
 import torch
-from importlib.metadata import version
-from models.nn_model import NeuralNetworkModel
-from solvers.dqn import optimize_model, initiate_stuff, select_action
+from solvers.dqn import select_action
 from models import RandomModel
 from train import flatten_dict
-import pickle
 
-# ['__annotations__', '__class__', '__class_getitem__', '__delattr__', '__dict__', '__dir__', '__doc__', '__enter__', '__eq__', '__exit__', '__format__', '__ge__', '__getattribute__', '__getstate__', '__gt__', '__hash__', '__init__', '__init_subclass__', '__le__', '__lt__', '__module__', '__ne__', '__new__', '__orig_bases__', '__parameters__', '__reduce__', '__reduce_ex__', '__repr__', '__setattr__', '__setstate__', '__sizeof__', '__slots__', '__str__', '__subclasshook__', '__weakref__', '_clean_particles', '_create_particle', '_destroy', '_ezpickle_args', '_ezpickle_kwargs', '_is_protocol', '_np_random', '_np_random_seed', 'action_space', 'clock', 'close', 'continuous', 'crash_penalty', 'enable_wind', 'get_wrapper_attr', 'gravity', 'has_wrapper_attr', 'isopen', 'lander', 'metadata', 'moon', 'np_random', 'np_random_seed', 'observation_space', 'particles', 'prev_reward', 'render', 'render_mode', 'reset', 'reward_shaping', 'screen', 'set_wrapper_attr', 'spec', 'step', 'turbulence_power', 'unwrapped', 'wind_power', 'world']
+#def make_env():
+#    instance = gym.make("FetchReach-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
+#    return instance
+# TODO remove later
 
-def make_env():
-    instance = gym.make("FetchReach-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
-    return instance
-
-
-env = make_env()
-
+# Creating environment
+gym.register_envs(gymnasium_robotics)
+env = gym.make("FetchReach-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
 observation, info = env.reset(seed=42)
 
+# Creating parser and adding arguments
 parser = argparse.ArgumentParser(description='Stochastic Neural Network')
-
 parser.add_argument("--resume", type=str, default=None, help="Parse URI of a trained model. If left empty a random_model is used for the simulation.")
 parser.add_argument("--save_as_csv", type=bool, default=False, help="save as csv")
-
 args = parser.parse_args()
 model_path = args.resume
 
+# Printing things
+if model_path is None:
+    print("Simulating with completely random actions")
+else:
+    print("Testing model", model_path)
+
+# Creating or loading the model depending on parsed model_path
 if model_path is None:
     model = RandomModel()
 else:
@@ -37,7 +39,7 @@ else:
 
 def get_action(observation, i):
     """
-
+    Returns the action for a specific observation.
     :return:
     """
     observation = flatten_dict(observation)
@@ -49,14 +51,13 @@ def get_action(observation, i):
         return action.tolist()
 
 # set duration of runtime loop
-N = 100000
+N = 500
 
 # stuff for saving observations and actions in csv
+# Handy in order to generate a decision tree.
 if args.save_as_csv:
     csv_data = ""
     N = 150 * 100
-
-# stuff = initiate_stuff()
 
 # loop
 summed_reward = 0
@@ -70,7 +71,6 @@ for _ in range(N):
             action) + "\n"
         print(_) if _ % 100 == 0 else None
 
-    # print(action, '\t'.join([str(round(float(i),2)) for i in observation.to('cpu').detach().numpy()]))
     observation, reward, terminated, truncated, info = env.step(action)
 
     summed_reward += reward

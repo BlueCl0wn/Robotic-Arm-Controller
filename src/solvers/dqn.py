@@ -106,7 +106,7 @@ def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.N
     # for each batch state according to policy_net
     #print("shape(state_batch) =", state_batch.shape)
     #print("shape(action_batch) = ", action_batch.shape)
-    state_action_values = policy_net(state_batch).gather(1, action_batch.long()) # This is from the example project. Here it makes a mess. Is okay to just remove?
+    state_action_values = policy_net(state_batch).gather(1, action_batch.long()) # This is from the example project. Here it makes a mess. Is it okay to just remove?
 
     #print("shape(policy_net(state_batch)) = ", policy_net(state_batch).shape)
     #print("shape(state_action_values) = ", state_action_values.shape)
