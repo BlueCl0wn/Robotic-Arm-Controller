@@ -50,6 +50,7 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     :param memory:
     :param i:
     :param params:
+    :param logger:
     :return:
     """
     sample = random.random()
