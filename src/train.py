@@ -120,7 +120,7 @@ def run() -> None:
         print("device = ", params.device)
 
         # ------ DQN Params -------
-        params.replay_mem_size = 50000 # Size of the replay memory
+        params.replay_mem_size = 1_000_000 # Size of the replay memory
         params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer
         params.GAMMA = 0.99  # discount factor as mentioned in the previous section
         params.EPS_START = 0.9  # starting value of epsilon
