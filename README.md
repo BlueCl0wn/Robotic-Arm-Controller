@@ -8,6 +8,9 @@
 - **Leo**  [Github](??)
   - ??
 
+## Problem
+https://robotics.farama.org/envs/fetch/reach/
+
 ## Tensorboard
 To use the Tensorboard run:
 'tensorboard --logdir=logs'

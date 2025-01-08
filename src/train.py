@@ -5,8 +5,10 @@ import gymnasium_robotics
 import torch
 import tqdm
 import numpy as np
+from collections import deque
 
 from itertools import count
+
 from common import get_file_descriptor, splash_screen
 from solvers.dqn import optimize_model, initiate_stuff, select_action
 
@@ -50,6 +52,7 @@ def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:
     """
     return np.concatenate([arr.flatten() for arr in d.values()])
 
+
 def run() -> None:
     """
     Run training of model.
@@ -69,10 +72,10 @@ def run() -> None:
     params.__dict__.update(args.__dict__)
     # Environment settings
     params.max_teps = 200
-    params.env = ("FetchReachDense-v3" , dict(max_episode_steps=params.max_teps,  reward_type="dense")) #
+    params.env = ("FetchReachDense-v3", dict(max_episode_steps=params.max_teps, reward_type="dense"))  #
     params.version = "v1"
-    #params.commit = repo.head.commit.hexsha
 
+    #params.commit = repo.head.commit.hexsha
 
     def make_env() -> gym.Env:
         """
@@ -88,6 +91,7 @@ def run() -> None:
         # instance.unwrapped.[variable_name] = [value]
 
         return instance
+
     env = make_env()
 
     def set_hyperparams() -> None:
@@ -97,13 +101,13 @@ def run() -> None:
         :return None:
         """
         # Set size of neural network
-        params.input_size = sum([i.shape[0] for i in env.observation_space.values()]) # This calculates the size of the
+        params.input_size = sum([i.shape[0] for i in env.observation_space.values()])  # This calculates the size of the
         #                                                                            observation space as a simple int.
         params.output_size = env.action_space.shape[0] if isinstance(env.action_space,
                                                                      gym.spaces.Box) else env.action_space.n
         #print("input_size = ",params.input_size)
         #print("output_size = ",params.output_size)
-        params.hidden_layers = [64, 64]
+        params.hidden_layers = [64, 128, 64]
 
         # Training parameters
         params.episode_start = 0
@@ -120,30 +124,34 @@ def run() -> None:
         print("device = ", params.device)
 
         # ------ DQN Params -------
-        params.replay_mem_size = 1_000_000 # Size of the replay memory
+        params.replay_mem_size = 10_000  # Size of the replay memory
         params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer
-        params.GAMMA = 0.99  # discount factor as mentioned in the previous section
+        params.GAMMA = 0.9  # discount factor as mentioned in the previous section
         params.EPS_START = 0.9  # starting value of epsilon
-        params.EPS_END = 0.05  # final value of epsilon
-        params.EPS_DECAY = 1000  # controls the rate of exponential decay of epsilon, higher means a slower decay
+        params.EPS_END = 0.01  # final value of epsilon
+        params.EPS_DECAY = 100  # controls the rate of exponential decay of epsilon, higher means a slower decay
         params.TAU = 0.005  # update rate of the target network
         params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
+
     set_hyperparams()
 
     # Logging hyperparameters.
     logger = splash_screen(params)
     logger.flush()
 
-    # initiate stuff for DQN TODO: maybe find a better name than stuff lol
     stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
-
+    # Initiate stuff for DQN. Either by loading from saved file or by creating.
     # Stuff in case resuming is enabled.
     if params.resume:
         resume = params.resume
-        stuff, i, params = torch.load(params.resume)
+        policy_net, target_net, optimizer, i, params = torch.load(params.resume)
+        #policy_net, target_net, optimizer, memory = stuff
         params.resume = resume
         params.episode_start = i
         print(f"Resuming training from episode {i} of {params.resume}")
+    #else:
+        # Creation of stuff in case no filepath is provided  / resuming is not enabled.
+        # TODO: maybe find a better name than stuff lol
 
     # TQDM loading bar stuff
     episodes = tqdm.trange(
@@ -151,6 +159,8 @@ def run() -> None:
         params.episodes + params.episode_start,
         desc="Fitness",
     )
+
+    avg_rewards = deque([], maxlen=50)
 
     # Training loop
     for i in episodes:
@@ -161,16 +171,15 @@ def run() -> None:
         #print("state: ", state, "\n", len(state))
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
         episode_reward_total = 0
-        for t in range(params.max_teps+10):
+        for t in range(params.max_teps + 10):
             #      Seems more useful to me as this way there is no step_limit to the simulation
-            action = select_action(env, state, *stuff, t, params, logger=logger)
+            action = select_action(env, state, *stuff, i, params, logger=logger)
             # print("action: ", action)
             observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
             reward = torch.tensor([reward_env], device=params.device)
             done = terminated or truncated
             episode_reward_total += reward_env
-
 
             if truncated:
                 next_state = None
@@ -201,12 +210,16 @@ def run() -> None:
             if done:
                 break
 
-        # This block saves the model every 100 episodes.
-        if i % 100 == 0:
+        # This block saves the model every 100 episodes and stores other values for use in tensorboard.
+        if i % 200 == 0:
             # save w to disk
             descrp = get_file_descriptor(params, i)
-            print(stuff, i, params)
-            torch.save((stuff, i, params), descrp)
+            # print(stuff, i, params)
+            torch.save((policy_net, target_net, optimizer, i, params), descrp)
+            logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)
+            logger.add_histogram("target_net_params", target_net.get_parameters(), i)
+            # logger.add_histogram("replay_memory", memory.get_list(), i)  TODO add this to logger. Doesn't work rn.
+            logger.add_scalar("replay_memory_length", len(memory), i)
 
         # This block checks the performance of the model every 10 episodes and saves that value.
         if i % 10 == 0:
@@ -214,14 +227,10 @@ def run() -> None:
             episodes.set_description(f"Fitness: {episode_reward_total:.2f}")
             # log fitness
             logger.add_scalar("fitness", episode_reward_total, i)
-        if i % 50 == 0:
-            logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)
-            logger.add_histogram("target_net_params", target_net.get_parameters(), i)
-            # logger.add_histogram("replay_memory", memory.get_list(), i)  TODO add this to logger. Doesn't work rn.
-            logger.add_scalar("replay_memory_length", len(memory), i)
+            logger.add_scalar("fitness_avg", 0 if (len(avg_rewards) == 0) else sum(avg_rewards)/len(avg_rewards) , i)
     env.close()
     pass
 
+
 if __name__ == '__main__':
     run()
-

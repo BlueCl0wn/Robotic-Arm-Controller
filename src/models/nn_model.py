@@ -25,7 +25,8 @@ class NeuralNetworkModel(Model, nn.Module):
             act_funcs = [nn.LeakyReLU()] * len(hidden_layers) + [nn.Softmax(dim=-1)] # List of activation functions.
 
         zipped = [elem for pair in zip(layers, act_funcs) for elem in pair] # Creates list with all layers and activation functions.
-
+        for i in range(0, len(zipped), 2):
+            torch.nn.init.xavier_uniform_(zipped[i].weight)
         self.linear = nn.Sequential(*zipped)
 
     def new_from_parameters(self, parameters: np.ndarray) -> 'NeuralNetworkModel':
