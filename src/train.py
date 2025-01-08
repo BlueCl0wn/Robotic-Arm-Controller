@@ -120,6 +120,7 @@ def run() -> None:
         print("device = ", params.device)
 
         # ------ DQN Params -------
+        params.replay_mem_size = 50000 # Size of the replay memory
         params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer
         params.GAMMA = 0.99  # discount factor as mentioned in the previous section
         params.EPS_START = 0.9  # starting value of epsilon
@@ -162,7 +163,7 @@ def run() -> None:
         episode_reward_total = 0
         for t in range(params.max_teps+10):
             #      Seems more useful to me as this way there is no step_limit to the simulation
-            action = select_action(env, state, *stuff, t, params, logger)
+            action = select_action(env, state, *stuff, t, params, logger=logger)
             # print("action: ", action)
             observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
@@ -215,6 +216,8 @@ def run() -> None:
         if i % 50 == 0:
             logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)
             logger.add_histogram("target_net_params", target_net.get_parameters(), i)
+            # logger.add_histogram("replay_memory", memory.get_list(), i)  TODO add this to logger. Doesn't work rn.
+            logger.add_scalar("replay_memory_length", len(memory), i)
     env.close()
     pass
 

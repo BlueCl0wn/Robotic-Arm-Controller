@@ -5,7 +5,7 @@ from .ReplayMemory import ReplayMemory, Transition
 import torch.optim as optim
 import argparse
 import gymnasium as gym
-
+import numpy as np
 import math
 import torch.nn as nn
 
@@ -16,7 +16,7 @@ source: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 
 
 
-def initiate_stuff(params: argparse.Namespace):
+def initiate_stuff(params: argparse.Namespace, random=True):
     """
     TODO add docstring
     :param params:
@@ -28,8 +28,25 @@ def initiate_stuff(params: argparse.Namespace):
     target_net = NeuralNetworkModel(params.input_size, params.output_size, params.hidden_layers).to(params.device)
     target_net.load_state_dict(policy_net.state_dict())
 
+    # Initializing the policy and target networks with random parameters
+    # I chose to initalize them with different sets of random parameters to increase the exploration.
+    # If random is set to False all parameters are zero.
+    if random:
+        # policy network
+        flat = policy_net.get_parameters()
+        # new = np.random.random(len(flat))
+        new = np.random.normal(loc=0, scale=1.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        policy_net.set_parameters(new)
+
+        # target network
+        flat = target_net.get_parameters()
+        # new = np.random.random(len(flat))
+        new = np.random.normal(loc=0, scale=1.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        target_net.set_parameters(new)
+
+
     optimizer = optim.AdamW(policy_net.parameters(), lr=params.LR, amsgrad=True)
-    memory = ReplayMemory(10000) # TODO add param in params for this number?
+    memory = ReplayMemory(params.replay_mem_size) # TODO add param in params for this number?
 
     return policy_net, target_net, optimizer, memory
 
@@ -38,7 +55,7 @@ def initiate_stuff(params: argparse.Namespace):
 
 
 
-def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory, i, params: argparse.Namespace, logger):
+def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory, i, params: argparse.Namespace, logger=None):
     """
     TODO add better comments and type hinting
     TODO: remove unused parameters? might make parsing a bit more annoying
@@ -58,7 +75,7 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
         math.exp(-1. * i / params.EPS_DECAY)
     i += 1
 
-    if i % 10 == 0:
+    if logger is not None and (i % 10 == 0):
         logger.add_histogram("epsilon_threshold", eps_threshold, i)
 
     if sample > eps_threshold:
