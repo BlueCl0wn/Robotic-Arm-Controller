@@ -205,6 +205,7 @@ def run() -> None:
         if i % 100 == 0:
             # save w to disk
             descrp = get_file_descriptor(params, i)
+            print(stuff, i, params)
             torch.save((stuff, i, params), descrp)
 
         # This block checks the performance of the model every 10 episodes and saves that value.

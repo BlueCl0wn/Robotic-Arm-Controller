@@ -35,7 +35,7 @@ def initiate_stuff(params: argparse.Namespace, random=True):
         # policy network
         flat = policy_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=0, scale=1.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        new = np.random.normal(loc=0, scale=1, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
         policy_net.set_parameters(new)
 
         # target network
@@ -76,7 +76,7 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     i += 1
 
     if logger is not None and (i % 10 == 0):
-        logger.add_histogram("epsilon_threshold", eps_threshold, i)
+        logger.add_scalar("epsilon_threshold", eps_threshold, i)
 
     if sample > eps_threshold:
         with (torch.no_grad()):
