@@ -7,14 +7,9 @@ from solvers.dqn import select_action
 from models import RandomModel
 from train import flatten_dict
 
-#def make_env():
-#    instance = gym.make("FetchReach-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
-#    return instance
-# TODO remove later
-
 # Creating environment
 gym.register_envs(gymnasium_robotics)
-env = gym.make("FetchReach-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
+env = gym.make("FetchReachDense-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
 observation, info = env.reset(seed=42)
 
 # Creating parser and adding arguments

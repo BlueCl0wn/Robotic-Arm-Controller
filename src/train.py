@@ -162,7 +162,7 @@ def run() -> None:
         episode_reward_total = 0
         for t in range(params.max_teps+10):
             #      Seems more useful to me as this way there is no step_limit to the simulation
-            action = select_action(env, state, *stuff, t, params)
+            action = select_action(env, state, *stuff, t, params, logger)
             # print("action: ", action)
             observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
@@ -212,9 +212,9 @@ def run() -> None:
             episodes.set_description(f"Fitness: {episode_reward_total:.2f}")
             # log fitness
             logger.add_scalar("fitness", episode_reward_total, i)
+        if i % 50 == 0:
             logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)
             logger.add_histogram("target_net_params", target_net.get_parameters(), i)
-            # TODO add other interesting information to logger
     env.close()
     pass
 

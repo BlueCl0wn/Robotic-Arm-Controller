@@ -38,7 +38,7 @@ def initiate_stuff(params: argparse.Namespace):
 
 
 
-def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory, i, params: argparse.Namespace):
+def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory, i, params: argparse.Namespace, logger):
     """
     TODO add better comments and type hinting
     TODO: remove unused parameters? might make parsing a bit more annoying
@@ -56,6 +56,10 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     eps_threshold = params.EPS_END + (params.EPS_START - params.EPS_END) * \
         math.exp(-1. * i / params.EPS_DECAY)
     i += 1
+
+    if i % 10 == 0:
+        logger.add_histogram("epsilon_threshold", eps_threshold, i)
+
     if sample > eps_threshold:
         with (torch.no_grad()):
             # t.max(1) will return the largest column value of each row.
