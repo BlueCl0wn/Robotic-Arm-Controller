@@ -46,7 +46,7 @@ def initiate_stuff(params: argparse.Namespace, random=True):
 
 
     optimizer = optim.AdamW(policy_net.parameters(), lr=params.LR, amsgrad=True)
-    memory = ReplayMemory(params.replay_mem_size) # TODO add param in params for this number?
+    memory = ReplayMemory(params.replay_mem_size)
 
     return policy_net, target_net, optimizer, memory
 

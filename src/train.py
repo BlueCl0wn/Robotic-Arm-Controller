@@ -104,7 +104,7 @@ def run() -> None:
         params.TAU = 0.005  # update rate of the target network # 0.005 start value
         params.LR = 5e-4  # learning rate of the ``AdamW`` optimizer
 
-        # if GPU is to be used TODO This might be nice to implement because rn this is slow as fuck.
+        # if GPU is to be used
         params.device = torch.device(
             "cuda" if torch.cuda.is_available() else
             "mps" if torch.backends.mps.is_available() else
@@ -127,7 +127,7 @@ def run() -> None:
     # Stuff in case resuming is enabled.
     if params.resume:
         resume = params.resume
-        policy_net, target_net, optimizer, i, params = torch.load(params.resume) # TODO this makes all hyperparams adjustments useless when resuming.
+        policy_net, target_net, optimizer, i, params = torch.load(params.resume)
         #policy_net, target_net, optimizer, memory = stuff
         params.resume = resume
         params.max_steps = params.max_teps
@@ -220,7 +220,6 @@ def run() -> None:
             torch.save((policy_net, target_net, optimizer, i, params), descrp)
             logger.add_histogram("policy_net_params", policy_net.get_parameters(), i)
             logger.add_histogram("target_net_params", target_net.get_parameters(), i)
-            # logger.add_histogram("replay_memory", memory.get_list(), i)  TODO add this to logger. Doesn't work rn.
             logger.add_scalar("replay_memory_length", len(memory), i)
 
 

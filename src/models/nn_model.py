@@ -29,20 +29,6 @@ class NeuralNetworkModel(Model, nn.Module):
             #torch.nn.init.xavier_uniform_(zipped[i].weight)
         self.linear = nn.Sequential(*zipped)
 
-    def new_from_parameters(self, parameters: np.ndarray) -> 'NeuralNetworkModel':
-        """
-        Creates a new instance of the NeuralNetworkModel class from a list of parameters.
-        New returned model has the same hyperparams as self.
-        TODO: Is this a good way to do this? Another init may be better.
-
-        :param parameters: List of parameters to create the new instance from.
-        :return: New instance of the NeuralNetworkModel class.
-        """
-        model = NeuralNetworkModel(self.input_size, self.output_size, self.hidden_layers)
-        model.set_parameters(parameters)
-
-        return model
-
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         """
         Forward pass of the neural network.
