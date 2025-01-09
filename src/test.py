@@ -1,15 +1,14 @@
 import gymnasium as gym
 import gymnasium_robotics
-import numpy as np
 import argparse
 import torch
 from solvers.dqn import select_action
-from models import RandomModel
+from src.models import RandomModel
 from train import flatten_dict
 
 # Creating environment
 gym.register_envs(gymnasium_robotics)
-env = gym.make("FetchReachDense-v3", max_episode_steps=200, reward_type="dense", render_mode="human")
+env = gym.make("FetchReachDense-v3", max_episode_steps=50, reward_type="dense", render_mode="human")
 observation, info = env.reset(seed=42)
 
 # Creating parser and adding arguments
@@ -30,7 +29,8 @@ if model_path is None:
     model = RandomModel()
 else:
     loaded_data = torch.load(model_path, weights_only=False)
-    stuff, i, params = loaded_data
+    policy_net, target_net, optimizer, i, params = loaded_data
+    stuff = policy_net, target_net, optimizer, None
 
 def get_action(observation, i):
     """

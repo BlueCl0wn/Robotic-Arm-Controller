@@ -1,19 +1,11 @@
-import argparse
-
+import argparse, time, torch, tqdm
 import gymnasium as gym
 import gymnasium_robotics
-import torch
-import tqdm
 import numpy as np
 from collections import deque
-
-from itertools import count
-
 from common import get_file_descriptor, splash_screen
 from solvers.dqn import optimize_model, initiate_stuff, select_action
 
-
-# from solvers.nes_demo import NES, sample_distribution
 
 def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:
     """
@@ -52,7 +44,6 @@ def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:
     """
     return np.concatenate([arr.flatten() for arr in d.values()])
 
-
 def run() -> None:
     """
     Run training of model.
@@ -71,30 +62,16 @@ def run() -> None:
 
     params.__dict__.update(args.__dict__)
     # Environment settings
-    params.max_teps = 200
-    params.env = ("FetchReachDense-v3", dict(max_episode_steps=params.max_teps, reward_type="dense"))  #
+    params.max_steps = 50
+    params.env = ("FetchReachDense-v3", dict(max_episode_steps=params.max_steps, reward_type="dense"))  #
     params.version = "v1"
 
-    #params.commit = repo.head.commit.hexsha
+    # Create instance of Gymnasium environment. All arguments parsed to the parser are automatically parsed to gym.make().
+    # To change environment variables do so in this method according to comments.
+    gym.register_envs(gymnasium_robotics)
+    env = gym.make(params.env[0], **params.env[1])
 
-    def make_env() -> gym.Env:
-        """
-        Create instance of Gymnasium environment. All arguments parsed to the parser are automatically parsed to gym.make().
-        To change environment variables do so in this method according to comments.
-
-        :return None:
-        """
-        gym.register_envs(gymnasium_robotics)
-        instance = gym.make(params.env[0], **params.env[1])
-
-        # Change environment variables:
-        # instance.unwrapped.[variable_name] = [value]
-
-        return instance
-
-    env = make_env()
-
-    def set_hyperparams() -> None:
+    def set_hyperparams_fixed() -> None:
         """
         Sets values for parameters on call. To add or change parameter value do so according to comments.
 
@@ -107,13 +84,25 @@ def run() -> None:
                                                                      gym.spaces.Box) else env.action_space.n
         #print("input_size = ",params.input_size)
         #print("output_size = ",params.output_size)
-        params.hidden_layers = [64, 128, 64]
+        params.hidden_layers = [64, 64, 64]
 
-        # Training parameters
         params.episode_start = 0
+        # Training parameters
         params.repetitions = 100
         params.npop = 30
+
+    def set_hyperparams_run() -> None:
         params.episodes = 50_000
+
+        # ------ DQN Params -------
+        params.replay_mem_size = 200_000  # Size of the replay memory
+        params.BATCH_SIZE = 64  # number of transitions sampled from the replay buffer
+        params.GAMMA = 0.98  # discount factor as mentioned in the previous section
+        params.EPS_START = 0.9  # starting value of epsilon
+        params.EPS_END = 0.02  # final value of epsilon
+        params.EPS_DECAY = 100_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
+        params.TAU = 0.005  # update rate of the target network # 0.005 start value
+        params.LR = 5e-4  # learning rate of the ``AdamW`` optimizer
 
         # if GPU is to be used TODO This might be nice to implement because rn this is slow as fuck.
         params.device = torch.device(
@@ -121,46 +110,44 @@ def run() -> None:
             "mps" if torch.backends.mps.is_available() else
             "cpu"
         )
+
         print("device = ", params.device)
 
-        # ------ DQN Params -------
-        params.replay_mem_size = 10_000  # Size of the replay memory
-        params.BATCH_SIZE = 128  # number of transitions sampled from the replay buffer
-        params.GAMMA = 0.9  # discount factor as mentioned in the previous section
-        params.EPS_START = 0.9  # starting value of epsilon
-        params.EPS_END = 0.01  # final value of epsilon
-        params.EPS_DECAY = 100  # controls the rate of exponential decay of epsilon, higher means a slower decay
-        params.TAU = 0.005  # update rate of the target network
-        params.LR = 1e-4  # learning rate of the ``AdamW`` optimizer
-
-    set_hyperparams()
+    set_hyperparams_fixed()
+    set_hyperparams_run()
 
     # Logging hyperparameters.
     logger = splash_screen(params)
     logger.flush()
 
+    # Creation of stuff in case no filepath is provided  / resuming is not enabled.
+    # TODO: maybe find a better name than stuff lol
     stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
-    # Initiate stuff for DQN. Either by loading from saved file or by creating.
+
     # Stuff in case resuming is enabled.
     if params.resume:
         resume = params.resume
-        policy_net, target_net, optimizer, i, params = torch.load(params.resume)
+        policy_net, target_net, optimizer, i, params = torch.load(params.resume) # TODO this makes all hyperparams adjustments useless when resuming.
         #policy_net, target_net, optimizer, memory = stuff
         params.resume = resume
+        params.max_steps = params.max_teps
         params.episode_start = i
         print(f"Resuming training from episode {i} of {params.resume}")
-    #else:
-        # Creation of stuff in case no filepath is provided  / resuming is not enabled.
-        # TODO: maybe find a better name than stuff lol
+        set_hyperparams_run()
+
+    # Setting hyperparams which are not fixed for a specific network.
+    # This needs to be here. Ensures that adjusting hyperparams still affects resumed training.
+    set_hyperparams_run()
+
 
     # TQDM loading bar stuff
     episodes = tqdm.trange(
         params.episode_start,
         params.episodes + params.episode_start,
         desc="Fitness",
-    )
+        )
 
-    avg_rewards = deque([], maxlen=50)
+    avg_rewards = deque([], maxlen=200)
 
     # Training loop
     for i in episodes:
@@ -171,12 +158,14 @@ def run() -> None:
         #print("state: ", state, "\n", len(state))
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
         episode_reward_total = 0
-        for t in range(params.max_teps + 10):
-            #      Seems more useful to me as this way there is no step_limit to the simulation
+        for t in range(params.max_steps + 10):
+            time_action_1 = time.time()
             action = select_action(env, state, *stuff, i, params, logger=logger)
-            # print("action: ", action)
+            time_action_2 = time.time()
+            time_observation_1 = time.time()
             observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
+            time_observation_2 = time.time()
             reward = torch.tensor([reward_env], device=params.device)
             done = terminated or truncated
             episode_reward_total += reward_env
@@ -186,15 +175,20 @@ def run() -> None:
             else:
                 next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
 
+            time_memory_1 = time.time()
             # Store the transition in memory
             memory.push(state, action, next_state, reward)
+            time_memory_2 = time.time()
 
             # Move to the next state
             state = next_state
 
+            time_optimize_1 = time.time()
             # Perform one step of the optimization (on the policy network)
             optimize_model(*stuff, params)
+            time_optimize_2 = time.time()
 
+            time_nets_1 = time.time()
             # Soft update of the target network's weights
             # θ′ ← τ θ + (1 −τ )θ′
             target_net_state_dict = target_net.state_dict()
@@ -203,6 +197,14 @@ def run() -> None:
                 target_net_state_dict[key] = policy_net_state_dict[key] * params.TAU + target_net_state_dict[key] * (
                         1 - params.TAU)
             target_net.load_state_dict(target_net_state_dict)
+            time_nets_2 = time.time()
+
+            if False:
+                print("time action: ", time_action_1 - time_action_2)
+                print("time memory: ", time_memory_1 - time_memory_2)
+                print("time optimize: ", time_optimize_1 - time_optimize_2)
+                print("time nets: ", time_nets_1 - time_nets_2)
+                print("time observation: ", time_observation_1 - time_observation_2)
 
             # log
             # logger.add_scalar("sigma", params.sigma, i)
@@ -220,6 +222,9 @@ def run() -> None:
             logger.add_histogram("target_net_params", target_net.get_parameters(), i)
             # logger.add_histogram("replay_memory", memory.get_list(), i)  TODO add this to logger. Doesn't work rn.
             logger.add_scalar("replay_memory_length", len(memory), i)
+
+
+        avg_rewards.append(episode_reward_total) # Add episode_reward to deque to compute running average of fitness.
 
         # This block checks the performance of the model every 10 episodes and saves that value.
         if i % 10 == 0:
