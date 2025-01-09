@@ -129,6 +129,7 @@ def run() -> None:
         resume = params.resume
         policy_net, target_net, optimizer, i, params = torch.load(params.resume)
         #policy_net, target_net, optimizer, memory = stuff
+        stuff = policy_net, target_net, optimizer, memory
         params.resume = resume
         params.max_steps = params.max_teps
         params.episode_start = i
