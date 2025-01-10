@@ -92,17 +92,17 @@ def run() -> None:
         params.npop = 30
 
     def set_hyperparams_run() -> None:
-        params.episodes = 50_000
+        params.episodes = 100_000
 
         # ------ DQN Params -------
-        params.replay_mem_size = 200_000  # Size of the replay memory
-        params.BATCH_SIZE = 64  # number of transitions sampled from the replay buffer
-        params.GAMMA = 0.98  # discount factor as mentioned in the previous section
-        params.EPS_START = 0.9  # starting value of epsilon
+        params.replay_mem_size = 10_000  # Size of the replay memory
+        params.BATCH_SIZE = 16  # number of transitions sampled from the replay buffer
+        params.GAMMA = 0.5  # discount factor as mentioned in the previous section
+        params.EPS_START = 2  # starting value of epsilon
         params.EPS_END = 0.02  # final value of epsilon
-        params.EPS_DECAY = 100_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
+        params.EPS_DECAY = 200_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
         params.TAU = 0.005  # update rate of the target network # 0.005 start value
-        params.LR = 5e-4  # learning rate of the ``AdamW`` optimizer
+        params.LR = 1e-3  # learning rate of the ``AdamW`` optimizer
 
         # if GPU is to be used
         params.device = torch.device(
@@ -110,7 +110,6 @@ def run() -> None:
             "mps" if torch.backends.mps.is_available() else
             "cpu"
         )
-
         print("device = ", params.device)
 
     set_hyperparams_fixed()
@@ -131,7 +130,7 @@ def run() -> None:
         #policy_net, target_net, optimizer, memory = stuff
         stuff = policy_net, target_net, optimizer, memory
         params.resume = resume
-        params.max_steps = params.max_teps
+        #params.max_steps = params.max_teps
         params.episode_start = i
         print(f"Resuming training from episode {i} of {params.resume}")
         set_hyperparams_run()
@@ -214,7 +213,7 @@ def run() -> None:
                 break
 
         # This block saves the model every 100 episodes and stores other values for use in tensorboard.
-        if i % 200 == 0:
+        if i % 250 == 0:
             # save w to disk
             descrp = get_file_descriptor(params, i)
             # print(stuff, i, params)

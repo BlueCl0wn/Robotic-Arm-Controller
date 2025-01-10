@@ -29,19 +29,19 @@ def initiate_stuff(params: argparse.Namespace, random=True):
     target_net.load_state_dict(policy_net.state_dict())
 
     # Initializing the policy and target networks with random parameters
-    # I chose to initalize them with different sets of random parameters to increase the exploration.
+    # I chose to initialize them with different sets of random parameters to increase the exploration.
     # If random is set to False all parameters are zero.
-    if False:
+    if random:
         # policy network
         flat = policy_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=0, scale=1, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        new = np.random.normal(loc=0, scale=0.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
         policy_net.set_parameters(new)
 
         # target network
         flat = target_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=0, scale=1, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        new = np.random.normal(loc=0, scale=0.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
         target_net.set_parameters(new)
 
 

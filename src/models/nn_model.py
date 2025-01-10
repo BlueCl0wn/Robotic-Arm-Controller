@@ -26,7 +26,7 @@ class NeuralNetworkModel(Model, nn.Module):
 
         zipped = [elem for pair in zip(layers, act_funcs) for elem in pair] # Creates list with all layers and activation functions.
         #for i in range(0, len(zipped), 2):
-            #torch.nn.init.xavier_uniform_(zipped[i].weight)
+            #torch.nn.init.xavier_uniform_(zipped[i].weight.T)
         self.linear = nn.Sequential(*zipped)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
