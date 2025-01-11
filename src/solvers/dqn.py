@@ -1,6 +1,6 @@
 import torch
 import random
-from src.models import NeuralNetworkModel
+from models import NeuralNetworkModel
 from .ReplayMemory import ReplayMemory, Transition
 import torch.optim as optim
 import argparse
@@ -59,16 +59,18 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     """
     TODO add better comments and type hinting
     TODO: remove unused parameters? might make parsing a bit more annoying
-    :param env:
-    :param state:
-    :param policy_net:
-    :param target_net:
-    :param optimizer:
-    :param memory:
-    :param i:
-    :param params:
-    :param logger:
-    :return:
+    :param env: The environment to interact with.
+    :param state: Current state of the environment.
+    :param policy_net: The Q-network used to select actions.
+    :param target_net: Target Q-network for stability in training.
+    :param optimizer: Optimizer used for updating the policy_net.
+    :param memory: Replay memory (supports Prioritized Experience Replay).
+    :param i: Current step or episode index.
+    :param params: Hyperparameters for epsilon decay and replay settings.
+    :param logger: Logger object for monitoring metrics.
+    
+    Returns: 
+    torch.Tensor: Selected action for the current state.
     """
     sample = random.random()
     eps_threshold = params.EPS_END + (params.EPS_START - params.EPS_END) * \
@@ -77,23 +79,20 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
 
     if logger is not None and (i % 10 == 0):
         logger.add_scalar("epsilon_threshold", eps_threshold, i)
-
+    
+    # Epsilon-greedy action selection
     if sample > eps_threshold:
         with (torch.no_grad()):
-            # t.max(1) will return the largest column value of each row.
-            # second column on max result is index of where max element was
-            # found, so we pick action with the larger expected reward.
-            # print("policy")
-            return policy_net(state).squeeze()
-
-            #return o.max(1).indices.view(1, 1)
+            q_values = policy_net(state)
+            action = q_values.max(1)[1].view(1, 1) # not sure if we need .view(1,1) to reshape the action
 
     else:
-        #print("random")
-        return torch.tensor(env.action_space.sample(), device=params.device, dtype=torch.float32)
-        #return env.action_space.sample()
+        # Select a random action
+        action = torch.tensor(env.action_space.sample(), device=params.device, dtype=torch.float32)
 
-def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.Namespace):
+    return action
+
+def optimize_model(policy_net, target_net, optimizer, memory, gamma, params: argparse.Namespace):
     """
     TODO: add better comments and type hinting
     :param policy_net:
@@ -105,7 +104,9 @@ def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.N
     """
     if len(memory) < params.BATCH_SIZE:
         return
-    transitions = memory.sample(params.BATCH_SIZE)
+
+
+    transitions, indices, weights = memory.sample(params.BATCH_SIZE)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
     # detailed explanation). This converts batch-array of Transitions
     # to Transition of batch-arrays.
@@ -119,40 +120,39 @@ def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.N
                                                 if s is not None])
     state_batch = torch.cat(batch.state)
     # action_batch = torch.cat(batch.action)
-    action_batch = torch.stack(batch.action).view(params.BATCH_SIZE, -1)
+    action_batch = torch.cat(batch.action).long().unsqueeze(1)
 
     reward_batch = torch.cat(batch.reward)
 
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
-    #print("shape(state_batch) =", state_batch.shape)
-    #print("shape(action_batch) = ", action_batch.shape)
-    state_action_values = policy_net(state_batch).gather(1, action_batch.long()) # This is from the example project. Here it makes a mess. Is it okay to just remove?
+    current_q_values = policy_net(state_batch).gather(1, action_batch.long()) 
 
-    #print("shape(policy_net(state_batch)) = ", policy_net(state_batch).shape)
-    #print("shape(state_action_values) = ", state_action_values.shape)
-
+    
     # Compute V(s_{t+1}) for all next states.
     # Expected values of actions for non_final_next_states are computed based
     # on the "older" target_net; selecting their best reward with max(1).values
     # This is merged based on the mask, such that we'll have either the expected
     # state value or 0 in case the state was final.
-    next_state_values = torch.zeros(params.BATCH_SIZE, device=params.device)
+    next_q_values = torch.zeros(params.BATCH_SIZE, device=params.device)
     with torch.no_grad():
-        next_state_values[non_final_mask] = target_net(non_final_next_states).max(1).values
+        next_q_values[non_final_mask] = target_net(non_final_next_states).max(1).values
     # Compute the expected Q values
-    expected_state_action_values = (next_state_values * params.GAMMA) + reward_batch
-    #print("shape(expected_state_action_values) = ", expected_state_action_values.shape)
-
-    # Compute Huber loss
-    criterion = nn.SmoothL1Loss()
-    loss = criterion(state_action_values, expected_state_action_values.unsqueeze(1))
-    #print("type of loss : " , loss.shape)
+    target_q_values = (next_q_values * params.GAMMA) + reward_batch
+    
+    # Compute weighted loss
+    weights = torch.tensor(weights, dtype=torch.float32, device=params.device)
+    loss = (weights * nn.functional.smooth_l1_loss(current_q_values, target_q_values.unsqueeze(1), reduction='none')).mean()
 
     # Optimize the model
     optimizer.zero_grad()
     loss.backward()
     # In-place gradient clipping
-    torch.nn.utils.clip_grad_value_(policy_net.parameters(), 100)
+    for param in policy_net.parameters():
+        param.grad.data.clamp_(-1, 1)    # TODO maybe adjust the clipping range
     optimizer.step()
+
+    # Update priorities in Replay Memory
+    td_errors = torch.abs(current_q_values - target_q_values.unsqueeze(1)).detach().cpu().numpy()
+    memory.update_priorities(indices, td_errors.flatten())

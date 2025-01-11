@@ -158,11 +158,15 @@ def run() -> None:
         #print("state: ", state, "\n", len(state))
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
         episode_reward_total = 0
+
         for t in range(params.max_steps + 10):
             time_action_1 = time.time()
+            # Select action using epsilon-greedy strategy
             action = select_action(env, state, *stuff, i, params, logger=logger)
             time_action_2 = time.time()
+
             time_observation_1 = time.time()
+            # Interact with the environment
             observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
             time_observation_2 = time.time()
@@ -185,7 +189,8 @@ def run() -> None:
 
             time_optimize_1 = time.time()
             # Perform one step of the optimization (on the policy network)
-            optimize_model(*stuff, params)
+            GAMMA = 0.99 # discount factor for future rewards
+            optimize_model(*stuff, GAMMA, params)
             time_optimize_2 = time.time()
 
             time_nets_1 = time.time()
