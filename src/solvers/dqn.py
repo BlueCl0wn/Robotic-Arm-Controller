@@ -1,7 +1,8 @@
 import torch
 import random
-from models import NeuralNetworkModel
-from .ReplayMemory import ReplayMemory, Transition
+from src.models import NeuralNetworkModel
+# from .ReplayMemory import ReplayMemory, Transition
+from .PrioritizedReplayMemory import PrioritizedReplayMemory as ReplayMemory, Transition
 import torch.optim as optim
 import argparse
 import gymnasium as gym
@@ -14,12 +15,11 @@ import torch.nn as nn
 source: https://pytorch.org/tutorials/intermediate/reinforcement_q_learning.html
 """
 
-
-
 def initiate_stuff(params: argparse.Namespace, random=True):
     """
     TODO add docstring
     :param params:
+    :param random: If True weights are initialized with a normal distribution around set mu and sigma. If Falls standard initialization is used.
     :return:
     """
     #policy_net = DQN(n_observations, n_actions).to(params.device)
@@ -35,13 +35,13 @@ def initiate_stuff(params: argparse.Namespace, random=True):
         # policy network
         flat = policy_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=0, scale=0.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        new = np.random.normal(loc=-0.4, scale=0.2, size=len(flat)) # mu and sigma chosen by gut-feeling
         policy_net.set_parameters(new)
 
         # target network
         flat = target_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=0, scale=0.5, size=len(flat)) # sigma=1.5 is chosen by gut-feeling
+        new = np.random.normal(loc=-0.4, scale=0.2, size=len(flat)) # mu and sigma chosen by gut-feeling
         target_net.set_parameters(new)
 
 
@@ -104,7 +104,7 @@ def optimize_model(policy_net, target_net, optimizer, memory, gamma, params: arg
     """
     if len(memory) < params.BATCH_SIZE:
         return
-
+    print(params.BATCH_SIZE)
 
     transitions, indices, weights = memory.sample(params.BATCH_SIZE)
     # Transpose the batch (see https://stackoverflow.com/a/19343/3343043 for
@@ -127,7 +127,8 @@ def optimize_model(policy_net, target_net, optimizer, memory, gamma, params: arg
     # Compute Q(s_t, a) - the model computes Q(s_t), then we select the
     # columns of actions taken. These are the actions which would've been taken
     # for each batch state according to policy_net
-    current_q_values = policy_net(state_batch).gather(1, action_batch.long()) 
+    current_q_values = policy_net(state_batch)
+    current_q_values = current_q_values.gather(1, action_batch.long())
 
     
     # Compute V(s_{t+1}) for all next states.
