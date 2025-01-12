@@ -20,12 +20,3 @@ class ReplayMemory(object):
 
     def __len__(self):
         return len(self.memory)
-
-    def get_list(self) -> list:
-        """
-        Returns the deque as a flattened list. Maybe useful in order to log the state of the ReplayMemory in the Tensorboard.
-        :return:
-        """
-        #print("deque as list:")
-        #return list(chain.from_iterable(self.memory))
-        raise NotImplementedError

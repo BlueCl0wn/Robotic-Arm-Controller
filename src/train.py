@@ -110,6 +110,7 @@ def run() -> None:
             "mps" if torch.backends.mps.is_available() else
             "cpu"
         )
+        params.device = torch.device("cpu")
         print("device = ", params.device)
 
     set_hyperparams_fixed()
