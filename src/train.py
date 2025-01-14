@@ -69,7 +69,9 @@ def run() -> None:
     # Create instance of Gymnasium environment. All arguments parsed to the parser are automatically parsed to gym.make().
     # To change environment variables do so in this method according to comments.
     gym.register_envs(gymnasium_robotics)
-    env = gym.make(params.env[0], **params.env[1])
+    #env = gym.make(params.env[0], **params.env[1]) # Create environment
+    envs = gym.make_vec(id=params.env[0], num_envs=12, vectorization_mode="async", **params.env[1]) # Create vectorized environment
+
 
     def set_hyperparams_fixed() -> None:
         """
