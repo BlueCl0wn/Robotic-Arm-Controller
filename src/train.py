@@ -88,21 +88,19 @@ def run() -> None:
 
         params.episode_start = 0
         # Training parameters
-        params.repetitions = 100
-        params.npop = 30
 
     def set_hyperparams_run() -> None:
-        params.episodes = 100_000
+        params.episodes = 1_000_002
 
         # ------ DQN Params -------
         params.replay_mem_size = 10_000  # Size of the replay memory
-        params.BATCH_SIZE = 16  # number of transitions sampled from the replay buffer
-        params.GAMMA = 0.5  # discount factor as mentioned in the previous section
-        params.EPS_START = 2  # starting value of epsilon
-        params.EPS_END = 0.02  # final value of epsilon
-        params.EPS_DECAY = 200_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
-        params.TAU = 0.005  # update rate of the target network # 0.005 start value
-        params.LR = 1e-3  # learning rate of the ``AdamW`` optimizer
+        params.BATCH_SIZE = 32  # number of transitions sampled from the replay buffer
+        params.GAMMA = 0.99  # discount factor as mentioned in the previous section
+        params.EPS_START = 1  # starting value of epsilon
+        params.EPS_END = 0.01  # final value of epsilon
+        params.EPS_DECAY = 500_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
+        params.TAU = 0.01  # update rate of the target network # 0.005 start value
+        params.LR = 5e-8  # learning rate of the ``AdamW`` optimizer
 
         # if GPU is to be used
         params.device = torch.device(
@@ -148,7 +146,8 @@ def run() -> None:
         desc="Fitness",
         )
 
-    avg_rewards = deque([], maxlen=200)
+    avg_rewards_200 = deque([], maxlen=200)
+    avg_rewards_1000 = deque([], maxlen=1000)
 
     # Training loop
     for i in episodes:
@@ -214,7 +213,7 @@ def run() -> None:
                 break
 
         # This block saves the model every 100 episodes and stores other values for use in tensorboard.
-        if i % 250 == 0:
+        if i % 500 == 0:
             # save w to disk
             descrp = get_file_descriptor(params, i)
             # print(stuff, i, params)
@@ -224,7 +223,8 @@ def run() -> None:
             logger.add_scalar("replay_memory_length", len(memory), i)
 
 
-        avg_rewards.append(episode_reward_total) # Add episode_reward to deque to compute running average of fitness.
+        avg_rewards_200.append(episode_reward_total) # Add episode_reward to deque to compute running average of fitness.
+        avg_rewards_1000.append(episode_reward_total) # Add episode_reward to deque to compute running average of fitness.
 
         # This block checks the performance of the model every 10 episodes and saves that value.
         if i % 10 == 0:
@@ -232,7 +232,8 @@ def run() -> None:
             episodes.set_description(f"Fitness: {episode_reward_total:.2f}")
             # log fitness
             logger.add_scalar("fitness", episode_reward_total, i)
-            logger.add_scalar("fitness_avg", 0 if (len(avg_rewards) == 0) else sum(avg_rewards)/len(avg_rewards) , i)
+            logger.add_scalar("fitness_avg_200", 0 if (len(avg_rewards_200) == 0) else sum(avg_rewards_200)/len(avg_rewards_200) , i)
+            logger.add_scalar("fitness_avg_1000", 0 if (len(avg_rewards_1000) == 0) else sum(avg_rewards_1000)/len(avg_rewards_1000) , i)
     env.close()
     pass
 

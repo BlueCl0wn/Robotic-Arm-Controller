@@ -32,18 +32,18 @@ else:
     policy_net, target_net, optimizer, i, params = loaded_data
     stuff = policy_net, target_net, optimizer, None
 
-def get_action(observation, i):
+def get_action(_observation, _i):
     """
     Returns the action for a specific observation.
     :return:
     """
-    observation = flatten_dict(observation)
+    _observation = flatten_dict(_observation)
     if model_path is None:
         return model.make_decision(4)
     else:
-        state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
-        action = select_action(env, state, *stuff, i, params)
-        return action.tolist()
+        state = torch.tensor(_observation, dtype=torch.float32, device=params.device).unsqueeze(0)
+        _action = select_action(env, state, *stuff, _i, params)
+        return _action.tolist()
 
 # set duration of runtime loop
 N = 10000
