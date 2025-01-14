@@ -80,12 +80,14 @@ def run() -> None:
         :return None:
         """
         # Set size of neural network
-        params.input_size = sum([i.shape[0] for i in env.observation_space.values()])  # This calculates the size of the
+        params.input_size = sum([i.shape[0] for i in envs.observation_space.values()])  # This calculates the size of the
         #                                                                            observation space as a simple int.
-        params.output_size = env.action_space.shape[0] if isinstance(env.action_space,
-                                                                     gym.spaces.Box) else env.action_space.n
-        #print("input_size = ",params.input_size)
-        #print("output_size = ",params.output_size)
+        #envs.observation_space.shape[0]
+        print("envs.observation_space.values()", envs.observation_space.values())
+        params.output_size = envs.action_space.shape[1] if isinstance(envs.action_space,
+                                                                     gym.spaces.Box) else envs.action_space.n
+        print("input_size = ",params.input_size)
+        print("output_size = ",params.output_size)
         params.hidden_layers = [64, 64, 64]
 
         params.episode_start = 0
@@ -155,17 +157,17 @@ def run() -> None:
     for i in episodes:
 
         # Initialize the environment and get its state
-        state, info = env.reset()
+        state, info = envs.reset()
         state = flatten_dict(state)
         #print("state: ", state, "\n", len(state))
         state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
         episode_reward_total = 0
         for t in range(params.max_steps + 10):
             time_action_1 = time.time()
-            action = select_action(env, state, *stuff, i, params, logger=logger)
+            action = select_action(envs, state, *stuff, i, params, logger=logger)
             time_action_2 = time.time()
             time_observation_1 = time.time()
-            observation, reward_env, terminated, truncated, _ = env.step(action.tolist())
+            observation, reward_env, terminated, truncated, _ = envs.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
             time_observation_2 = time.time()
             reward = torch.tensor([reward_env], device=params.device)
@@ -236,7 +238,7 @@ def run() -> None:
             logger.add_scalar("fitness", episode_reward_total, i)
             logger.add_scalar("fitness_avg_200", 0 if (len(avg_rewards_200) == 0) else sum(avg_rewards_200)/len(avg_rewards_200) , i)
             logger.add_scalar("fitness_avg_1000", 0 if (len(avg_rewards_1000) == 0) else sum(avg_rewards_1000)/len(avg_rewards_1000) , i)
-    env.close()
+    envs.close()
     pass
 
 
