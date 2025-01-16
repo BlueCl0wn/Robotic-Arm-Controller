@@ -63,7 +63,7 @@ def run() -> None:
     params.__dict__.update(args.__dict__)
     # Environment settings
     params.max_steps = 50
-    params.env = ("FetchReachDense-v3", dict(max_episode_steps=params.max_steps, reward_type="dense"))  #
+    params.env = ("FetchReachDense-v4", dict(max_episode_steps=params.max_steps, reward_type="dense"))  #
     params.version = "v1"
 
     # Create instance of Gymnasium environment. All arguments parsed to the parser are automatically parsed to gym.make().
@@ -100,7 +100,7 @@ def run() -> None:
         params.EPS_END = 0.01  # final value of epsilon
         params.EPS_DECAY = 500_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
         params.TAU = 0.01  # update rate of the target network # 0.005 start value
-        params.LR = 5e-8  # learning rate of the ``AdamW`` optimizer
+        params.LR = 1e-6  # learning rate of the ``AdamW`` optimizer
 
         # if GPU is to be used
         params.device = torch.device(

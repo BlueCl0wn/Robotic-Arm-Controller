@@ -35,13 +35,13 @@ def initiate_stuff(params: argparse.Namespace, random=True):
         # policy network
         flat = policy_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=-0.4, scale=0.2, size=len(flat)) # mu and sigma chosen by gut-feeling
+        new = np.random.normal(loc=-0.29, scale=0.15, size=len(flat)) # mu and sigma chosen by gut-feeling
         policy_net.set_parameters(new)
 
         # target network
         flat = target_net.get_parameters()
         # new = np.random.random(len(flat))
-        new = np.random.normal(loc=-0.4, scale=0.2, size=len(flat)) # mu and sigma chosen by gut-feeling
+        new = np.random.normal(loc=-0.29, scale=0.15, size=len(flat)) # mu and sigma chosen by gut-feeling
         target_net.set_parameters(new)
 
 
