@@ -64,14 +64,15 @@ def run() -> None:
     params.__dict__.update(args.__dict__)
     # Environment settings
     params.max_steps = 50
-    params.env = ("FetchReachDense-v3", dict(max_episode_steps=params.max_steps, reward_type="dense"))  #
+    params.parallel_size = 12
+    params.env = ("FetchReachDense-v4", dict(max_episode_steps=params.max_steps, reward_type="dense"))  #
     params.version = "v1"
 
     # Create instance of Gymnasium environment. All arguments parsed to the parser are automatically parsed to gym.make().
     # To change environment variables do so in this method according to comments.
     gym.register_envs(gymnasium_robotics)
     #env = gym.make(params.env[0], **params.env[1]) # Create environment
-    envs = gym.make_vec(id=params.env[0], num_envs=12, vectorization_mode="async", **params.env[1]) # Create vectorized environment
+    envs = gym.make_vec(id=params.env[0], num_envs=params.parallel_size, vectorization_mode="async", **params.env[1]) # Create vectorized environment
 
 
     def set_hyperparams_fixed() -> None:
@@ -105,7 +106,7 @@ def run() -> None:
         params.EPS_END = 0.01  # final value of epsilon
         params.EPS_DECAY = 500_000  # controls the rate of exponential decay of epsilon, higher means a slower decay
         params.TAU = 0.01  # update rate of the target network # 0.005 start value
-        params.LR = 5e-8  # learning rate of the ``AdamW`` optimizer
+        params.LR = 1e-6  # learning rate of the ``AdamW`` optimizer
 
         # if GPU is to be used
         params.device = torch.device(
@@ -127,6 +128,8 @@ def run() -> None:
     # TODO: maybe find a better name than stuff lol
     stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
 
+    print("samples", envs.action_space.sample())
+    print("policy_net", policy_net(torch.tensor(envs.action_space.sample(), device=params.device, dtype=torch.float32)).squeeze())
     # Stuff in case resuming is enabled.
     if params.resume:
         resume = params.resume
@@ -154,36 +157,61 @@ def run() -> None:
     avg_rewards_200 = deque([], maxlen=200)
     avg_rewards_1000 = deque([], maxlen=1000)
 
+    def get_states(envs: gym.VectorEnv) -> list[torch.Tensor]:
+        """
+        Resets the provided environments and return the states as a list of torch.Tensor.
+        :param envs: vectorized gymnasium environment
+        :return: list of torch.Tensor containing states
+        """
+        states, info = envs.reset()
+        states = flatten_dict(states)
+        #print("state: ", state, "\n", len(state))
+        states = [torch.tensor(state_i, dtype=torch.float32, device=params.device).unsqueeze(0) for state_i in states]
+        return states
+
+
+    def get_observation(actions: gym.VectorEnv) -> tuple:
+        """
+        Get neext state vectors.
+        :param actions:
+        :return:
+        """
+        actions = [action.tolist() for action in actions]
+        observations, rewards, terminated, truncated, _ = envs.step(actions)
+        observations = flatten_dict(observations)  # flatten observation from dict[np.ndarray] to np.ndarray
+        # print("observation:", observation)
+        rewards = [torch.tensor([reward], device=params.device) for reward in rewards]
+        done = terminated or truncated
+        return observations, rewards, done
+
+
+    next_state = np.empty(params.parallel_size)
     # Training loop
     for i in episodes:
 
-        # Initialize the environment and get its state
-        state, info = envs.reset()
-        state = flatten_dict(state)
-        #print("state: ", state, "\n", len(state))
-        state = torch.tensor(state, dtype=torch.float32, device=params.device).unsqueeze(0)
+        # reset environment and get states
+        state = get_states(envs)
+
         episode_reward_total = 0
         for t in range(params.max_steps + 10):
             time_action_1 = time.time()
             action = select_action(envs, state, *stuff, i, params, logger=logger)
             #print("actions: ", action)
             time_action_2 = time.time()
+
             time_observation_1 = time.time()
-            observation, reward_env, terminated, truncated, _ = envs.step(action.tolist())
-            observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
-            #print("observation:", observation)
-            time_observation_2 = time.time()
-            reward = torch.tensor([reward_env], device=params.device)
-            done = terminated or truncated
+            observations, rewards, done = get_observation(action)
             episode_reward_total += reward_env
+            time_observation_2 = time.time()
 
-            if truncated:
-                next_state = None
-            else:
-                next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
+            #if done:
+            #    next_state = None
+            #else:
+            #    next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
 
-            next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
-            next_state[truncated] = None
+            next_state[not done] = np.array([torch.tensor(observation_i, dtype=torch.float32,
+                                                          device=params.device).unsqueeze(0) for observation_i in observation])[not done]
+            next_state[done] = None
 
             time_memory_1 = time.time()
             # Store the transition in memory

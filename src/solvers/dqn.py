@@ -90,7 +90,7 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
 
     else:
         #print("random")
-        return torch.tensor(env.action_space.sample(), device=params.device, dtype=torch.float32)
+        return torch.tensor(env.action_space.sample()[0], device=params.device, dtype=torch.float32)
         #return env.action_space.sample()
 
 def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.Namespace):
