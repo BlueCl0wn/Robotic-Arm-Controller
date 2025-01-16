@@ -17,6 +17,9 @@ To use the Tensorboard run:
 
 ## Citations
 
+idea: https://www.findingtheta.com/blog/mastering-robotic-manipulation-with-reinforcement-learning-tqc-and-ddpg-for-fetch-environments
+
+
 https://github.com/Lord225/stochastic-gym-solver
 
 

@@ -42,7 +42,8 @@ def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:
     - This function uses numpy.concatenate(), which is efficient for
       combining multiple arrays.
     """
-    return np.concatenate([arr.flatten() for arr in d.values()])
+    #return np.concatenate(np.asarray(d.values()), axis=0)
+    return np.concatenate([np.asarray(value) for value in d.values()], axis=1)
 
 def run() -> None:
     """
@@ -79,15 +80,15 @@ def run() -> None:
 
         :return None:
         """
-        # Set size of neural network
-        params.input_size = sum([i.shape[0] for i in envs.observation_space.values()])  # This calculates the size of the
+        # Set size of neural network TODO not correct
+        params.input_size = sum([i.shape[-1] for i in envs.observation_space.values()])  # This calculates the size of the
         #                                                                            observation space as a simple int.
         #envs.observation_space.shape[0]
-        print("envs.observation_space.values()", envs.observation_space.values())
-        params.output_size = envs.action_space.shape[1] if isinstance(envs.action_space,
+        #print("envs.observation_space.values()", envs.observation_space.values())
+        params.output_size = envs.action_space.shape[-1] if isinstance(envs.action_space,
                                                                      gym.spaces.Box) else envs.action_space.n
-        print("input_size = ",params.input_size)
-        print("output_size = ",params.output_size)
+        #print("input_size = ",params.input_size)
+        #print("output_size = ",params.output_size)
         params.hidden_layers = [64, 64, 64]
 
         params.episode_start = 0
@@ -165,10 +166,12 @@ def run() -> None:
         for t in range(params.max_steps + 10):
             time_action_1 = time.time()
             action = select_action(envs, state, *stuff, i, params, logger=logger)
+            #print("actions: ", action)
             time_action_2 = time.time()
             time_observation_1 = time.time()
             observation, reward_env, terminated, truncated, _ = envs.step(action.tolist())
             observation = flatten_dict(observation)  # flatten observation from dict[np.ndarray] to np.ndarray
+            #print("observation:", observation)
             time_observation_2 = time.time()
             reward = torch.tensor([reward_env], device=params.device)
             done = terminated or truncated
@@ -178,6 +181,9 @@ def run() -> None:
                 next_state = None
             else:
                 next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
+
+            next_state = torch.tensor(observation, dtype=torch.float32, device=params.device).unsqueeze(0)
+            next_state[truncated] = None
 
             time_memory_1 = time.time()
             # Store the transition in memory
