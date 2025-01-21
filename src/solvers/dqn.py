@@ -34,14 +34,12 @@ def initiate_stuff(params: argparse.Namespace, random=True):
     if random:
         # policy network
         flat = policy_net.get_parameters()
-        # new = np.random.random(len(flat))
-        new = np.random.normal(loc=-0.29, scale=0.15, size=len(flat)) # mu and sigma chosen by gut-feeling
+        new = np.random.normal(loc=-0.4, scale=0.2, size=len(flat)) # mu and sigma chosen by gut-feeling
         policy_net.set_parameters(new)
 
         # target network
-        flat = target_net.get_parameters()
-        # new = np.random.random(len(flat))
-        new = np.random.normal(loc=-0.29, scale=0.15, size=len(flat)) # mu and sigma chosen by gut-feeling
+        #flat = target_net.get_parameters()
+        # new = np.random.normal(loc=-0.4, scale=0.2, size=len(flat)) # mu and sigma chosen by gut-feeling
         target_net.set_parameters(new)
 
 
@@ -70,6 +68,7 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     :param logger:
     :return:
     """
+    print("dfdsfsfsd")
     sample = random.random()
     eps_threshold = params.EPS_END + (params.EPS_START - params.EPS_END) * \
         math.exp(-1. * i / params.EPS_DECAY)
@@ -80,9 +79,6 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
 
     if sample > eps_threshold:
         with (torch.no_grad()):
-            # t.max(1) will return the largest column value of each row.
-            # second column on max result is index of where max element was
-            # found, so we pick action with the larger expected reward.
             # print("policy")
             return policy_net(state).squeeze()
 
@@ -91,7 +87,6 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     else:
         #print("random")
         return torch.tensor(env.action_space.sample(), device=params.device, dtype=torch.float32)
-        #return env.action_space.sample()
 
 def optimize_model(policy_net, target_net, optimizer, memory, params: argparse.Namespace):
     """

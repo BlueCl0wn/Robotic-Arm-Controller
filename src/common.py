@@ -3,15 +3,22 @@ import datetime
 import os
 from tensorboardX import SummaryWriter
 import config
+import numpy as np
 
 
-def splash_screen(params: Namespace):
+def splash_screen(params: Namespace) -> str:
+    """
+    Creates splash screen for training.
+    :param params: Namespace containing info of training run
+    :return: text for splash screen
+    """
     print(r"""
     Stochastic GYM Trainer ; Commit before running                                                           
     """)
-    run_name = config.RUN_NAME + params.version # "_" + params.commit[:8] + "_" + params.version
-    print(f" Version: {params.version} ".center(88, "="))
+    run_name = config.RUN_NAME  # "_" + params.commit[:8] + "_" + params.version
+    print(f" Training Network".center(88, "="))
     print(f" Run Name: {run_name} ".center(88, "="))
+    print(f" Running of device {params.device} ".center(88, "="))
 
     train_summary_writer = SummaryWriter(log_dir=os.path.join(config.LOG_DIR_ROOT, run_name))
 
@@ -38,3 +45,41 @@ def get_file_descriptor(params: Namespace, episode: int) -> str:
     :return: str
     """
     return f"{config.MODELS_DIR}/{params.version}_{config.RUN_NAME}_{episode}.pth" #  '_{params.commit[:8]}'
+
+
+def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:
+    """
+    Flatten a dictionary of n-dimensional NumPy ndarrays into a single n-dimensional NumPy ndarray.
+
+    This function takes a dictionary where the values are NumPy ndarrays,
+    flattens each array, and concatenates them into a single 1D ndarray.
+
+    Parameters:
+    -----------
+    d : dict
+        A dictionary where the values are NumPy ndarrays. The keys can be
+        of any hashable type. The arrays can have any shape or dimension.
+
+    Returns:
+    --------
+    numpy.ndarray
+        A 1D NumPy ndarray containing all elements from the input arrays,
+        concatenated in the order they appear in the dictionary.
+
+    Examples:
+    ---------
+    >> import numpy as np
+    >> d = {'a': np.array([[1, 2], [3, 4]]),
+    ...      'b': np.array([5, 6, 7]),
+    ...      'c': np.array([[8], [9], [10]])}
+    >> flatten_dict_of_ndarrays(d)
+    array([ 1,  2,  3,  4,  5,  6,  7,  8,  9, 10])
+
+    Notes:
+    ------
+    - The order of elements in the output array depends on the order of
+      items in the input dictionary and the order of elements in each array.
+    - This function uses numpy.concatenate(), which is efficient for
+      combining multiple arrays.
+    """
+    return np.concatenate([arr.flatten() for arr in d.values()])

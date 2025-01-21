@@ -53,15 +53,6 @@ class NeuralNetworkModel(Model, nn.Module):
         p = output.detach().numpy()
         return np.random.choice(np.arange(4), p=p/np.sum(p))
 
-    def get_parameters_dict(self) -> dict:
-        parameters = {}
-        for name, param in self.linear.named_parameters():
-            parameters[name] = param.detach().numpy()  # Detach and convert to NumPy array
-        return parameters
-
-    def get_parameters_iterator(self):
-        return self.linear.parameters() # outputs Iterator[Parameter]
-
     def get_parameters(self) -> np.ndarray:
         """
         Returns all parameters of the NN model as one flattened list.
@@ -74,7 +65,8 @@ class NeuralNetworkModel(Model, nn.Module):
         """
         Takes a one-dimensional / flat list and uses it to assign the parameters of the NN.
 
-        :param flat_params: Flat list of parameters of the NN model. Must have same size as the list gotten with 'self.flatten_parameters()'.
+        :param flat_params: Flat list of parameters of the NN model.
+                            Must have same size as the list gotten with 'self.flatten_parameters()'.
         :return: None
         """
 
@@ -98,15 +90,6 @@ class NeuralNetworkModel(Model, nn.Module):
             param.data.copy_(flat_params[current_position:current_position + param_size].view_as(param)) # type: ignore
             # Update current position.
             current_position += param_size
-
-    def get_model_penalty(self,) -> float:
-        # get r2 of each layer
-        # return sum of r2 of each layer
-        penalty = 0
-        for param in self.linear.parameters():
-            penalty += torch.sum(param**2)
-
-        return float(penalty)
 
 
 if __name__ == "__main__":
