@@ -12,13 +12,11 @@ def splash_screen(params: Namespace) -> str:
     :param params: Namespace containing info of training run
     :return: text for splash screen
     """
-    print(r"""
-    Stochastic GYM Trainer ; Commit before running                                                           
-    """)
+
     run_name = config.RUN_NAME  # "_" + params.commit[:8] + "_" + params.version
     print(f" Training Network".center(88, "="))
     print(f" Run Name: {run_name} ".center(88, "="))
-    print(f" Running of device {params.device} ".center(88, "="))
+    print(f"   Running on device {params.device}   ".center(88, "="))
 
     train_summary_writer = SummaryWriter(log_dir=os.path.join(config.LOG_DIR_ROOT, run_name))
 
@@ -44,7 +42,7 @@ def get_file_descriptor(params: Namespace, episode: int) -> str:
     :param episode: episode number at moment of saving
     :return: str
     """
-    return f"{config.MODELS_DIR}/{params.version}_{config.RUN_NAME}_{episode}.pth" #  '_{params.commit[:8]}'
+    return f"{config.MODELS_DIR}/{config.RUN_NAME}_{episode}.pth" #  '_{params.commit[:8]}'
 
 
 def flatten_dict(d: dict[np.ndarray]) -> np.ndarray:

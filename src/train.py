@@ -82,7 +82,7 @@ def run() -> None:
             "cpu"
         )
         params.device = torch.device("cpu")
-        print("device = ", params.device)
+        #print("device = ", params.device)
 
     # set hyperparams
     set_hyperparams_fixed()
@@ -90,7 +90,7 @@ def run() -> None:
 
     # Creation of stuff in case no filepath is provided  / resuming is not enabled.
     # TODO: maybe find a better name than stuff lol
-    stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params)
+    stuff = policy_net, target_net, optimizer, memory = initiate_stuff(params, random=False)
 
     # Stuff in case resuming is enabled.
     if params.resume:
@@ -209,13 +209,13 @@ def run() -> None:
         # This block checks the performance of the model every 10 episodes and saves that value.
         if i % 10 == 0:
             # Change current reference_fitness shown in loading bar.
-            episodes.set_description(f"Fitness_average: {0 if (len(avg_rewards_5000[-200:]) == 0) else sum(avg_rewards_5000[-200:])/len(avg_rewards_5000[-200:]):.2f}")
+            episodes.set_description(f"Fitness_average: {0 if (len(avg_rewards_200) == 0) else sum(avg_rewards_200)/len(avg_rewards_200):.2f}")
             # log fitness
             logger.add_scalar("fitness_avg_200",
-                              0 if (len(avg_rewards_5000[-200:]) == 0) else sum(avg_rewards_5000[-200:])/len(avg_rewards_5000[-200:]),
+                              0 if (len(avg_rewards_200) == 0) else sum(avg_rewards_200)/len(avg_rewards_200),
                               i)
             logger.add_scalar("fitness_avg_1000",
-                              0 if (len(avg_rewards_5000[-1000:]) == 0) else sum(avg_rewards_5000[-1000:])/len(avg_rewards_1500[-1000:]),
+                              0 if (len(avg_rewards_1000) == 0) else sum(avg_rewards_1000)/len(avg_rewards_1000),
                               i)
             logger.add_scalar("fitness_avg_5000",
                               0 if (len(avg_rewards_5000) == 0) else sum(avg_rewards_5000)/len(avg_rewards_5000),

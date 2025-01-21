@@ -68,7 +68,6 @@ def select_action(env: gym.Env, state, policy_net, target_net, optimizer, memory
     :param logger:
     :return:
     """
-    print("dfdsfsfsd")
     sample = random.random()
     eps_threshold = params.EPS_END + (params.EPS_START - params.EPS_END) * \
         math.exp(-1. * i / params.EPS_DECAY)
