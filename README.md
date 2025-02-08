@@ -39,11 +39,6 @@ We trained our model for 150.000 timesteps. As you can see below after ~40.000 t
 ![training_progress](https://github.com/user-attachments/assets/a9d6ecdd-34ea-48d2-a293-460a03df8d4f)
 ![Bildschirmfoto vom 2025-02-08 16-38-28](https://github.com/user-attachments/assets/44271fb0-2747-4a73-9353-d0c1adda44df)
 
-
-## Tensorboard
-To use the Tensorboard run:
-'tensorboard --logdir=logs'
-
 ## Citations
 
 https://github.com/Lord225/stochastic-gym-solver
