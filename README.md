@@ -41,6 +41,10 @@ The trained model (tqc_fetchreach_150k.zip) can be tested by running *test_saved
 ![training_progress](https://github.com/user-attachments/assets/a9d6ecdd-34ea-48d2-a293-460a03df8d4f)
 ![Bildschirmfoto vom 2025-02-08 16-38-28](https://github.com/user-attachments/assets/44271fb0-2747-4a73-9353-d0c1adda44df)
 
+
+https://github.com/user-attachments/assets/62660920-28b5-4049-9c7e-c8f50ee14dd8
+
+
 ## Citations
 
 https://github.com/Lord225/stochastic-gym-solver
