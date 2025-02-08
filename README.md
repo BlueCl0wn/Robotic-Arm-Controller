@@ -34,7 +34,9 @@ https://sb3-contrib.readthedocs.io/en/master/modules/tqc.html
 
 The File *main.py* uses this library to train and evaluate the Robotic Arm for the FetchReach-v4 Environment. It is crucial to install gymnasium robotics directly from Github to be able to access v4. 
 
-We trained our model for 150.000 timesteps. As you can see below after ~40.000 timesteps the mean reward is really good at -1.60 +/- 0.92 (optimal reward would be 0) and doesn't improve much after that. We even tried training for 500.000 timesteps, but the results are the same. 
+We trained our model for 150.000 timesteps. As you can see below after ~40.000 timesteps the mean reward is really good at -1.60 +/- 0.92 (optimal reward would be 0) and doesn't improve much after that. We even tried training for 500.000 timesteps, but the results are the same.
+
+The trained model (tqc_fetchreach_150k.zip) can be tested by running *test_saved_model.py*. 
 
 ![training_progress](https://github.com/user-attachments/assets/a9d6ecdd-34ea-48d2-a293-460a03df8d4f)
 ![Bildschirmfoto vom 2025-02-08 16-38-28](https://github.com/user-attachments/assets/44271fb0-2747-4a73-9353-d0c1adda44df)
